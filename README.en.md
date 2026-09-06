@@ -6,13 +6,13 @@ EOS App is a desktop AI coding workspace designed for real project conversations
 
 EOS App is the official desktop distribution repository, providing installers, release notes, screenshots, and basic product information.
 
-This repository does not include the EOS App desktop source code. Core capabilities of EOS App are built on top of the open-source [EOS CLI](https://github.com/dreamSailing/eos).
+This repository does not include the EOS App desktop source code. Core capabilities of EOS App are built on top of the open-source [EOS](https://github.com/eosaios/eos).
 
 The current release is `v1.0.0-beta.4`. Every package ships the signed Rust Core (sha256-verified, Ed25519-signed) across three platforms: Windows (setup installer + portable zip), macOS (dmg installer + portable tar.gz, Intel and Apple Silicon), and Linux (amd64 + arm64).
 
-- Distribution Repository: https://github.com/dreamSailing/eos-app
-- Issues: https://github.com/dreamSailing/eos-app/issues
-- Releases: https://github.com/dreamSailing/eos-app/releases
+- Distribution Repository: https://github.com/eosaios/eos-app
+- Issues: https://github.com/eosaios/eos-app/issues
+- Releases: https://github.com/eosaios/eos-app/releases
 
 ## Why EOS App?
 
@@ -56,7 +56,7 @@ Exact asset names, versions, and checksums are published on each Release page.
 
 Main workspace overview (macOS with native traffic-light window controls; Windows and Linux use matching platform-style buttons):
 
-![EOS App workspace overview](https://github.com/dreamSailing/eos-app/releases/download/v1.0.0-beta.4/workspace-overview.png)
+![EOS App workspace overview](https://github.com/eosaios/eos-app/releases/download/v1.0.0-beta.4/workspace-overview.png)
 
 - The left sidebar provides entry points for new chats, skills and apps, automations, and sessions
 - The center area hosts the main conversation workspace and quick-start suggestions
@@ -74,5 +74,5 @@ This repository is released under the EOS App Installer and Documentation Non-Co
 
 ## Contact
 
-- Issues: https://github.com/dreamSailing/eos-app/issues
+- Issues: https://github.com/eosaios/eos-app/issues
 - Commercial licensing: smart-os@qq.com

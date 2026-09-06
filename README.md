@@ -6,13 +6,13 @@
 
 EOS App 是官方桌面应用发行仓库，提供安装包、版本说明、截图与基础使用介绍。
 
-本仓库不提供 EOS App 桌面端源码。EOS App 的核心能力基于开源项目 [EOS CLI](https://github.com/dreamSailing/eos) 打造。
+本仓库不提供 EOS App 桌面端源码。EOS App 的核心能力基于开源项目 [EOS](https://github.com/eosaios/eos) 打造。
 
 当前 `v1.0.0-beta.4`，随包分发签名 Rust Core（sha256 校验 + Ed25519 验签），对外发布覆盖三端：Windows（setup 安装器 + 便携 zip）、macOS（dmg 安装镜像 + 便携 tar.gz，Intel + Apple Silicon）、Linux（amd64 + arm64）。
 
-- 发行仓库：https://github.com/dreamSailing/eos-app
-- 问题反馈：https://github.com/dreamSailing/eos-app/issues
-- 版本下载：https://github.com/dreamSailing/eos-app/releases
+- 发行仓库：https://github.com/eosaios/eos-app
+- 问题反馈：https://github.com/eosaios/eos-app/issues
+- 版本下载：https://github.com/eosaios/eos-app/releases
 
 ## 为什么选择 EOS App？
 
@@ -56,7 +56,7 @@ EOS App 是官方桌面应用发行仓库，提供安装包、版本说明、截
 
 主工作台总览（macOS，窗口控制为原生交通灯风格；Windows / Linux 为对应的平台风格按钮）：
 
-![EOS App 主工作台总览](https://github.com/dreamSailing/eos-app/releases/download/v1.0.0-beta.4/workspace-overview.png)
+![EOS App 主工作台总览](https://github.com/eosaios/eos-app/releases/download/v1.0.0-beta.4/workspace-overview.png)
 
 - 左侧提供新对话、技能和应用、自动化与会话入口
 - 中央区域用于承接对话内容、快捷建议与主要工作流
@@ -74,5 +74,5 @@ EOS App 是官方桌面应用发行仓库，提供安装包、版本说明、截
 
 ## 联系方式
 
-- 问题反馈：https://github.com/dreamSailing/eos-app/issues
+- 问题反馈：https://github.com/eosaios/eos-app/issues
 - 商业合作/授权咨询：smart-os@qq.com
