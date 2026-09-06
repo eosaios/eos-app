@@ -6,7 +6,7 @@
 
 EOS App 是官方桌面应用发行仓库，提供安装包、版本说明、截图与基础使用介绍。
 
-本仓库不提供 EOS App 桌面端源码。EOS App 的核心能力基于开源项目 [EOS](https://github.com/eosaios/eos) 打造。
+本仓库不提供 EOS App 桌面端源码。EOS App 的核心能力基于开源项目 [EOS CLI](https://github.com/eosaios/eos) 打造。
 
 当前 `v1.0.0-beta.4`，随包分发签名 Rust Core（sha256 校验 + Ed25519 验签），对外发布覆盖三端：Windows（setup 安装器 + 便携 zip）、macOS（dmg 安装镜像 + 便携 tar.gz，Intel + Apple Silicon）、Linux（amd64 + arm64）。
 

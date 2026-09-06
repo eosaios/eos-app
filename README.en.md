@@ -6,7 +6,7 @@ EOS App is a desktop AI coding workspace designed for real project conversations
 
 EOS App is the official desktop distribution repository, providing installers, release notes, screenshots, and basic product information.
 
-This repository does not include the EOS App desktop source code. Core capabilities of EOS App are built on top of the open-source [EOS](https://github.com/eosaios/eos).
+This repository does not include the EOS App desktop source code. Core capabilities of EOS App are built on top of the open-source [EOS CLI](https://github.com/eosaios/eos).
 
 The current release is `v1.0.0-beta.4`. Every package ships the signed Rust Core (sha256-verified, Ed25519-signed) across three platforms: Windows (setup installer + portable zip), macOS (dmg installer + portable tar.gz, Intel and Apple Silicon), and Linux (amd64 + arm64).
 
