@@ -75,4 +75,4 @@ EOS App 是官方桌面应用发行仓库，提供安装包、版本说明、截
 ## 联系方式
 
 - 问题反馈：https://github.com/eosaios/eos-app/issues
-- 商业合作/授权咨询：smart-os@qq.com
+- 商业合作/授权咨询：legal@eosaios.com

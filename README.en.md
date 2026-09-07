@@ -75,4 +75,4 @@ This repository is released under the EOS App Installer and Documentation Non-Co
 ## Contact
 
 - Issues: https://github.com/eosaios/eos-app/issues
-- Commercial licensing: smart-os@qq.com
+- Commercial licensing: legal@eosaios.com
