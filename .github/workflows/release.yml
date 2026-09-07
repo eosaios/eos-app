@@ -49,12 +49,12 @@ jobs:
           - { goos: linux, goarch: arm64, runner: ubuntu-24.04-arm, triple: aarch64-unknown-linux-gnu }
 
     steps:
-      # eos-app 的 go.mod replace github.com/dreamSailing/eos => ../eos-cli，
+      # eos-app 的 go.mod replace github.com/eosaios/eos => ../eos-cli，
       # 布局必须保持 app 与 eos-cli 同级。
       - name: Checkout app source
         uses: actions/checkout@v4
         with:
-          repository: dreamSailing/eos-app-src
+          repository: eosaios/eos-app-src
           ref: ${{ inputs.src_ref || 'main' }}
           token: ${{ secrets.EOS_CORE_PAT }}
           path: app
@@ -62,13 +62,13 @@ jobs:
       - name: Checkout eos-cli (dependency)
         uses: actions/checkout@v4
         with:
-          repository: dreamSailing/eos
+          repository: eosaios/eos
           path: eos-cli
 
       - name: Checkout core source
         uses: actions/checkout@v4
         with:
-          repository: dreamSailing/eos-core-rs
+          repository: eosaios/eos-core-rs
           ref: ${{ inputs.core_ref || 'main' }}
           token: ${{ secrets.EOS_CORE_PAT }}
           path: eos-core-rs
