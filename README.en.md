@@ -56,9 +56,9 @@ Exact asset names, versions, and checksums are published on each Release page.
 
 ### Demo video (90 seconds)
 
-<video src="https://eosaios.com/assets/eos-promo.mp4" poster="https://eosaios.com/assets/eos-promo-poster.jpg" controls playsinline></video>
+[![EOS App demo video (90 seconds): from one request to a working file](https://eosaios.com/assets/eos-promo-preview.gif)](https://eosaios.com/assets/eos-promo.mp4)
 
-From a single request to a working file — a full walkthrough of conversations, task execution, and file generation.
+Click the preview to watch the full walkthrough (90 seconds, MP4) — conversations, task execution, and file generation.
 
 Main workspace overview (macOS with native traffic-light window controls; Windows and Linux use matching platform-style buttons):
 
