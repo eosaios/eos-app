@@ -54,6 +54,12 @@ EOS App 是官方桌面应用发行仓库，提供安装包、版本说明、截
 
 ## 界面预览
 
+### 演示视频（90 秒）
+
+<video src="https://eosaios.com/assets/eos-promo.mp4" poster="https://eosaios.com/assets/eos-promo-poster.jpg" controls playsinline></video>
+
+从一句需求到可用的项目文件——完整演示对话协作、任务执行与文件生成。
+
 主工作台总览（macOS，窗口控制为原生交通灯风格；Windows / Linux 为对应的平台风格按钮）：
 
 ![EOS App 主工作台总览](https://github.com/eosaios/eos-app/releases/download/v1.0.0-beta.4/workspace-overview.png)
