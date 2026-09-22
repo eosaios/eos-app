@@ -2,83 +2,85 @@
 
 [中文](./README.md) | [English](./README.en.md)
 
-桌面端 AI 编码工作台，面向真实项目中的对话协作、任务执行、命令验证与工程管理。
+**桌面端 AI 编码工作台。** 在一个窗口里完成对话协作、任务执行、命令验证与工程管理——适合真实项目，而不是只聊代码。
 
-EOS App 是官方桌面应用发行仓库，提供安装包、版本说明、截图与基础使用介绍。
+- 下载安装包：[Releases](https://github.com/eosaios/eos-app/releases)（始终以最新 Release 为准）
+- 问题反馈：[Issues](https://github.com/eosaios/eos-app/issues)
+- 终端版：[EOS CLI](https://github.com/eosaios/eos)
 
-本仓库不提供 EOS App 桌面端源码。EOS App 的核心能力基于开源项目 [EOS CLI](https://github.com/eosaios/eos) 打造。
+本仓库是 EOS App 的**官方发行仓**：提供安装包、版本说明与产品介绍，**不包含桌面端源码**。核心能力基于开源项目 [EOS CLI](https://github.com/eosaios/eos) 的 Rust 内核，安装包内附签名 Core（SHA-256 校验 + Ed25519 验签）。
 
-当前 `v1.0.0-beta.4`，随包分发签名 Rust Core（sha256 校验 + Ed25519 验签），对外发布覆盖三端：Windows（setup 安装器 + 便携 zip）、macOS（dmg 安装镜像 + 便携 tar.gz，Intel + Apple Silicon）、Linux（amd64 + arm64）。
+## 为什么是 EOS App
 
-- 发行仓库：https://github.com/eosaios/eos-app
-- 问题反馈：https://github.com/eosaios/eos-app/issues
-- 版本下载：https://github.com/eosaios/eos-app/releases
+写代码这件事，往往卡在工具切换上：对话在一个窗口，终端在另一个，浏览器再一个，Git 状态又要自己盯。
 
-## 为什么选择 EOS App？
+EOS App 把这些收进同一工作台：
 
-| 诉求 | EOS App |
-|---|---|
-| 希望用桌面界面承接 AI 编码流程 | 统一收口对话、任务、命令与工程入口 |
-| 不想在多个工具之间来回切换 | 会话、任务、Bash、Worktree、诊断集中管理 |
-| 需要更稳定地查看上下文和状态 | 提供模型、规则、上下文、成本、诊断等独立页面 |
-| 需要更适合长期使用的工作台 | 命令面板、通知、连接管理与系统设置集中可见 |
+- **说清需求，就能推进**——对话、计划、任务、审批串成一条线
+- **AI 能上手操作网页**——内嵌实时浏览器，登录 / 验证时一键交还给你
+- **改动看得见**——Git 状态、命令输出、产物预览就在旁边
+- **长期用得顺**——主题皮肤、个性化回复、应用内更新、系统托盘
 
-## 核心能力
+## 能力一览
 
-- 对话工作区：围绕项目发起新对话，集中承接消息、附件与上下文协作
-- 任务中心：查看后台任务状态、执行进度与可中止作业
-- Bash 工作面：补充验证命令、查看最近输出与失败信息
-- Worktree 入口：辅助处理工作树边界与分支作业位
-- 连接与模型：统一管理模型连接、可用状态与相关配置
-- 规则与上下文：集中维护模型指令、上下文摘要与成本观察
-- 工程辅助页：提供 LSP、Diagnostics、Settings、Notifications 等页面
+**对话协作**  
+对话工作区 · 计划 / 自动模式 · 审批与沙箱档位 · AI 优化表达 · 采集板（满意回复存成知识卡）
 
-## 适用场景
+**任务与工程**  
+任务中心与计划待办 · Bash 工作面 · Git 提交推送与提醒 · Worktree / 远程仓库 · 变更汇总与产物预览
 
-- 希望在桌面端集中处理 AI 编码与工程协作的个人开发者
-- 需要一体化查看会话、任务、命令结果与系统状态的重度用户
-- 更偏好图形界面而非纯终端交互的 EOS 用户
+**浏览器协作**  
+内嵌实时浏览器（多标签、共享视口）· AI 导航 / 点选 / 填表 · 人工接管 · 选取元素引用进对话
 
-## 下载与安装包
+**模型与上下文**  
+多供应商模型接入 · 模型向导与连通测试 · 推理强度联动 · 实时上下文用量 · 规则 / 记忆 · 用量与费用
 
-本仓库面向桌面应用分发，公开内容以 README、版本说明和安装包为主。
+**扩展与外观**  
+技能和应用 · 插件市场 · 自动化 · 官方主题皮肤 + 导入 / GitHub 安装 · MCP / LSP / 网络 / 通知
 
-每个 Release 提供的发布资产：
+**桌面体验**  
+应用内更新 · 系统托盘与单实例 · 桌面通知 · Windows / macOS / Linux 三端原生窗口
 
-- Windows x64 setup 安装器（`eos-app-setup-<版本>.exe`）与便携压缩包
-- macOS dmg 安装镜像（Intel 与 Apple Silicon，拖拽安装）与便携 tar.gz
-- Linux tar.gz（amd64 与 arm64）
-- 校验文件 `SHA256SUMS.txt`
+## 平台与安装
 
-具体资产名称、版本号与校验信息以每个 Release 页面为准。
+| 平台 | 架构 | 安装方式 |
+|---|---|---|
+| Windows | x64 | setup 安装器，或便携 zip |
+| macOS | Intel / Apple Silicon | dmg 拖拽安装，或便携 tar.gz |
+| Linux | amd64 / arm64 | tar.gz |
+
+1. 打开 [Releases](https://github.com/eosaios/eos-app/releases)，下载对应平台的最新安装包
+2. 需要时用同页的 `SHA256SUMS.txt` 校验
+3. 安装后也可在应用内检查更新，自动下载安装
+
+> 发行物命名以每个 Release 页资产列表为准，版本号随发版自动更新，不在本文重复维护。
 
 ## 界面预览
 
 ### 演示视频（90 秒）
 
-[![EOS App 演示视频（90 秒）：从一句需求到可用的项目文件](https://eosaios.com/assets/eos-promo-preview.gif)](https://eosaios.com/assets/eos-promo.mp4)
+[![EOS App 演示视频：从一句需求到可用的项目文件](https://eosaios.com/assets/eos-promo-preview.gif)](https://eosaios.com/assets/eos-promo.mp4)
 
-点击上方预览，观看完整演示视频（90 秒，MP4）——对话协作、任务执行与文件生成。
+点击预览观看完整演示——对话协作、任务执行与文件生成。
 
-主工作台总览（macOS，窗口控制为原生交通灯风格；Windows / Linux 为对应的平台风格按钮）：
+主工作台（macOS 为原生交通灯窗口；Windows / Linux 为对应平台风格）：
 
-![EOS App 主工作台总览](https://github.com/eosaios/eos-app/releases/download/v1.0.0-beta.4/workspace-overview.png)
+![EOS App 主工作台](https://github.com/eosaios/eos-app/releases/download/v1.0.0-beta.4/workspace-overview.png)
 
-- 左侧提供新对话、技能和应用、自动化与会话入口
-- 中央区域用于承接对话内容、快捷建议与主要工作流
-- 底部输入区支持直接发起新任务，Bash 终端随附在工作台下方
+- 左侧：新对话、技能和应用、自动化，以及任务 / 工作树、用量 / 网络 / 记忆 / 帮助
+- 中央：对话与主工作流
+- 底部：发起新任务的输入区（可切换模型与推理强度），Bash 终端随附
 
 ## 许可证
 
-本仓库采用 EOS App 安装包与文档非商用许可证 v1.0，详见 [LICENSE](./LICENSE)：
+安装包与文档采用 EOS App 非商用许可证（见 [LICENSE](./LICENSE)）：
 
-- 个人/非商业用途可免费下载安装和使用官方安装包
-- 允许在非商业场景下原样分发官方安装包与随附文档
-- 本仓库不提供 EOS App 桌面端源码
-- 禁止任何商业使用（含企业内部生产用途、收费服务、SaaS、二次商业分发）
-- 商业使用必须获得版权人单独书面授权
+- 个人 / 非商业用途可免费下载、安装与使用，并允许原样分发官方安装包与文档
+- 禁止商业使用（含企业内部生产、收费服务、SaaS、二次商业分发）
+- 商业使用须版权人单独书面授权
+- 本仓库不提供桌面端源码
 
-## 联系方式
+## 联系
 
 - 问题反馈：https://github.com/eosaios/eos-app/issues
-- 商业合作/授权咨询：legal@eosaios.com
+- 商业合作 / 授权咨询：legal@eosaios.com
