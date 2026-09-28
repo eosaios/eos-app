@@ -230,3 +230,34 @@ jobs:
             --notes "三端生产包（Windows / macOS / Linux，含各架构）。内核为构建时指定 ref 的签名产物，桌面端启动无控制台窗口。校验见 SHA256SUMS.txt。" \
             --repo "$GITHUB_REPOSITORY" 2>/dev/null \
           || gh release upload "$VERSION" dist/* --clobber --repo "$GITHUB_REPOSITORY"
+
+  winget:
+    # 发版后自动向 microsoft/winget-pkgs 提 manifest 更新 PR。
+    # 前置：仓库 Settings → Secrets → 新建 WINGET_TOKEN（classic PAT，
+    # 勾选 public_repo；用提交 winget PR 的 GitHub 账号生成，
+    # 注意 PAT 过期后本 job 会失败，需要换新）。
+    # 首次手动提交的 manifest 合并后，本 job 才会成功（包需已存在于 winget）。
+    # WebView2 依赖（Microsoft.Edge.WebView2Runtime）暂不能声明：
+    # winget-pkgs 策略不允许新版包带依赖，待包发布后单独提 PR 追加。
+    name: Submit to winget-pkgs
+    runs-on: windows-latest
+    needs: release
+    if: ${{ vars.WINGET_SUBMIT != 'off' }}
+    steps:
+      - name: Download wingetcreate
+        run: |
+          Invoke-WebRequest -Uri "https://aka.ms/wingetcreate/latest" -OutFile wingetcreate.exe -UseBasicParsing
+          $ProgressPreference = "SilentlyContinue"
+
+      - name: Submit manifest update
+        env:
+          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+        run: |
+          $VERSION = "${{ inputs.version || github.ref_name }}"
+          $verNum = $VERSION.TrimStart("v")
+          wingetcreate.exe update EOSAIOS.EOSApp `
+            --version $verNum `
+            --urls "https://github.com/${{ github.repository }}/releases/download/$VERSION/eos-app-setup-$VERSION.exe" `
+            --token $env:WINGET_TOKEN `
+            --submit
+

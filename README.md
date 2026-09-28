@@ -8,7 +8,7 @@
 - 问题反馈：[Issues](https://github.com/eosaios/eos-app/issues)
 - 终端版：[EOS CLI](https://github.com/eosaios/eos)
 
-本仓库是 EOS App 的**官方发行仓**：提供安装包、版本说明与产品介绍，**不包含桌面端源码**。核心能力基于开源项目 [EOS CLI](https://github.com/eosaios/eos) 的 Rust 内核，安装包内附签名 Core（SHA-256 校验 + Ed25519 验签）。
+本仓库是 EOS App 的**官方发行仓**：提供安装包、版本说明与产品介绍，**不包含桌面端源码**。核心能力基于 [EOS CLI](https://github.com/eosaios/eos) 的 Rust 内核，安装包内附签名 Core（SHA-256 校验 + Ed25519 验签）。
 
 ## 为什么是 EOS App
 
@@ -65,7 +65,7 @@ EOS App 把这些收进同一工作台：
 
 主工作台（macOS 为原生交通灯窗口；Windows / Linux 为对应平台风格）：
 
-![EOS App 主工作台](https://github.com/eosaios/eos-app/releases/download/v1.0.0-beta.4/workspace-overview.png)
+![EOS App 主工作台](docs/images/workspace-overview.png)
 
 - 左侧：新对话、技能和应用、自动化，以及任务 / 工作树、用量 / 网络 / 记忆 / 帮助
 - 中央：对话与主工作流

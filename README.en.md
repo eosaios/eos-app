@@ -8,7 +8,7 @@
 - Issues: [Issues](https://github.com/eosaios/eos-app/issues)
 - Terminal edition: [EOS CLI](https://github.com/eosaios/eos)
 
-This repository is the **official distribution repo** for EOS App: installers, release notes, and product information — **not** the desktop source code. Core capabilities are built on the Rust core of the open-source [EOS CLI](https://github.com/eosaios/eos). Each package ships a signed Core (SHA-256 checksum + Ed25519 signature).
+This repository is the **official distribution repo** for EOS App: installers, release notes, and product information — **not** the desktop source code. Core capabilities are built on the Rust core of [EOS CLI](https://github.com/eosaios/eos). Each package ships a signed Core (SHA-256 checksum + Ed25519 signature).
 
 ## Why EOS App
 
@@ -65,7 +65,7 @@ Click the preview for the full walkthrough — conversation, task execution, and
 
 Main workspace (macOS uses native traffic-light window controls; Windows / Linux use matching platform-style buttons):
 
-![EOS App main workspace](https://github.com/eosaios/eos-app/releases/download/v1.0.0-beta.4/workspace-overview.png)
+![EOS App main workspace](docs/images/workspace-overview.png)
 
 - Left: new chat, skills and apps, automation, plus tasks / worktree, usage / network / memory / help
 - Center: conversation and the main workflow
