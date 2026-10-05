@@ -261,3 +261,87 @@ jobs:
             --token $env:WINGET_TOKEN `
             --submit
 
+  admin-upload:
+    # 发版后把五个平台安装包同步到管理后台版本管理（默认
+    # https://api.eosaios.com），客户端更新检查的后台源以这里的
+    # is_current 为权威（发布/回滚/灰度开关）。与 GitHub Release 双渠道
+    # 保持同步全靠本 job，手动传后台仅作补漏。
+    # 前置：仓库 Settings → Secrets 配三个值：
+    #   EOS_ADMIN_API_BASE  形如 https://api.eosaios.com（不带尾斜杠）
+    #   EOS_ADMIN_EMAIL     CI 专用管理账号邮箱
+    #   EOS_ADMIN_PASSWORD  该账号密码
+    # 开关：仓库 Variables 设 ADMIN_UPLOAD=off 可停用（发版事故隔离用）。
+    # 同 (应用,平台,通道,版本) 重复上传返回 409，视为已同步打 WARNING 继续；
+    # 其余非 200 直接 fail。
+    name: Sync to admin version management
+    runs-on: ubuntu-latest
+    needs: release
+    if: ${{ vars.ADMIN_UPLOAD != 'off' }}
+    steps:
+      - name: Upload assets to version management
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EOS_ADMIN_API_BASE: ${{ secrets.EOS_ADMIN_API_BASE }}
+          EOS_ADMIN_EMAIL: ${{ secrets.EOS_ADMIN_EMAIL }}
+          EOS_ADMIN_PASSWORD: ${{ secrets.EOS_ADMIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          VERSION="${{ inputs.version || github.ref_name }}"
+          VERNUM="${VERSION#v}"
+          case "$VERSION" in *-beta*|*-rc*) QUALITY=beta ;; *) QUALITY=stable ;; esac
+          API="${EOS_ADMIN_API_BASE%/}"
+          AUTH="Authorization: Bearer $(curl -fsS "$API/api/v1/admin/auth/login" \
+            -H 'Content-Type: application/json' \
+            -d "{\"email\":\"$EOS_ADMIN_EMAIL\",\"password\":\"$EOS_ADMIN_PASSWORD\"}" \
+            | jq -r '.data.access_token')"
+
+          gh release download "$VERSION" --repo "$GITHUB_REPOSITORY" --dir assets \
+            --pattern "eos-app-setup-$VERSION.exe" \
+            --pattern "eos-app_${VERNUM}_darwin-amd64.dmg" \
+            --pattern "eos-app_${VERNUM}_darwin-arm64.dmg" \
+            --pattern "eos-app_${VERNUM}_linux-amd64.tar.gz" \
+            --pattern "eos-app_${VERNUM}_linux-arm64.tar.gz"
+          ls -la assets/
+
+          NOTES=$(gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" --json body -q .body)
+          COMMIT="${{ inputs.src_ref || github.sha }}"
+
+          ensure_application() {
+            local platform="$1" display="$2" name="eos-app-$1" id
+            id=$(curl -fsS "$API/api/v1/admin/version-management/applications" -H "$AUTH" \
+              | jq -r --arg n "$name" '[.data.applications[] | select(.name==$n) | .id][0] // empty')
+            if [ -z "$id" ]; then
+              id=$(curl -fsS -X POST "$API/api/v1/admin/version-management/applications" \
+                -H "$AUTH" -H 'Content-Type: application/json' \
+                -d "{\"name\":\"$name\",\"app_key\":\"eos-app\",\"display_name\":\"$display\",\"platform\":\"$platform\",\"description\":\"EOS 桌面端\"}" \
+                | jq -r '.data.id')
+              echo "created application $name (id=$id)"
+            fi
+            echo "$id"
+          }
+
+          upload_asset() {
+            local platform="$1" display="$2" file="$3" app_id code
+            app_id=$(ensure_application "$platform" "$display")
+            code=$(curl -s -o /tmp/upload-resp.json -w '%{http_code}' \
+              -X POST "$API/api/v1/admin/version-management/versions/upload" -H "$AUTH" \
+              -F "application_id=$app_id" -F "product_version=$VERNUM" -F "commit=$COMMIT" \
+              -F "platform=$platform" -F "quality=$QUALITY" -F "release_notes=$NOTES" \
+              -F "is_current=true" -F "file=@assets/$file")
+            if [ "$code" = "200" ]; then
+              echo "uploaded $platform <- $file (quality=$QUALITY)"
+            elif [ "$code" = "409" ]; then
+              echo "::warning::版本管理已有 $platform $VERNUM（视为已同步，跳过）"
+            else
+              echo "::error::$platform 上传失败 HTTP $code：$(cat /tmp/upload-resp.json)"
+              exit 1
+            fi
+          }
+
+          upload_asset windows-amd64 "EOS App (Windows x64)" "eos-app-setup-$VERSION.exe"
+          upload_asset darwin-amd64 "EOS App (macOS Intel)" "eos-app_${VERNUM}_darwin-amd64.dmg"
+          upload_asset darwin-arm64 "EOS App (macOS Apple Silicon)" "eos-app_${VERNUM}_darwin-arm64.dmg"
+          upload_asset linux-amd64 "EOS App (Linux x64)" "eos-app_${VERNUM}_linux-amd64.tar.gz"
+          upload_asset linux-arm64 "EOS App (Linux ARM64)" "eos-app_${VERNUM}_linux-arm64.tar.gz"
+          echo "admin sync done: $VERNUM (quality=$QUALITY)"
+
