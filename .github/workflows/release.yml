@@ -332,7 +332,10 @@ jobs:
             if [ "$code" = "200" ]; then
               echo "uploaded $platform <- $file (quality=$QUALITY)"
             elif [ "$code" = "409" ]; then
-              echo "::warning::版本管理已有 $platform $VERNUM（视为已同步，跳过）"
+              echo "::warning::版本管理已有 $platform $VERNUM（视为已同步，补一次设为当前以自愈）"
+              curl -fsS -X PUT "$API/api/v1/admin/version-management/versions/status" -H "$AUTH" \
+                -H 'Content-Type: application/json' \
+                -d "{\"version_id\":$(curl -fsS "$API/api/v1/admin/version-management/versions?application_id=$app_id" -H "$AUTH" | jq -r --arg v "$VERNUM" '[.data[] | select(.product_version==$v) | .id][0]'),\"is_current\":true}" >/dev/null
             else
               echo "::error::$platform 上传失败 HTTP $code：$(cat /tmp/upload-resp.json)"
               exit 1
