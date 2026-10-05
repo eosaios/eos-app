@@ -332,10 +332,25 @@ jobs:
             if [ "$code" = "200" ]; then
               echo "uploaded $platform <- $file (quality=$QUALITY)"
             elif [ "$code" = "409" ]; then
-              echo "::warning::版本管理已有 $platform $VERNUM（视为已同步，补一次设为当前以自愈）"
-              curl -fsS -X PUT "$API/api/v1/admin/version-management/versions/status" -H "$AUTH" \
-                -H 'Content-Type: application/json' \
-                -d "{\"version_id\":$(curl -fsS "$API/api/v1/admin/version-management/versions?application_id=$app_id" -H "$AUTH" | jq -r --arg v "$VERNUM" '[.data[] | select(.product_version==$v) | .id][0]'),\"is_current\":true}" >/dev/null
+              # 同版本覆盖发版：删旧行（连带存储对象）后重传，内容与 is_current 全量刷新
+              OLD_ID=$(curl -fsS "$API/api/v1/admin/version-management/versions?application_id=$app_id" -H "$AUTH" \
+                | jq -r --arg v "$VERNUM" '[.data[] | select(.product_version==$v) | .id][0] // empty')
+              if [ -z "$OLD_ID" ]; then
+                echo "::error::$platform 409 但找不到已有版本行，人工检查"
+                exit 1
+              fi
+              curl -fsS -X DELETE "$API/api/v1/admin/version-management/versions/$OLD_ID" -H "$AUTH" >/dev/null
+              code2=$(curl -s -o /tmp/upload-resp2.json -w '%{http_code}' -X POST \
+                "$API/api/v1/admin/version-management/versions/upload" -H "$AUTH" \
+                -F "application_id=$app_id" -F "product_version=$VERNUM" -F "commit=$COMMIT" \
+                -F "platform=$platform" -F "quality=$QUALITY" -F "release_notes=$NOTES" \
+                -F "is_current=true" -F "file=@assets/$file")
+              if [ "$code2" = "200" ]; then
+                echo "replaced $platform $VERNUM (was 409, deleted and re-uploaded)"
+              else
+                echo "::error::$platform 覆盖重传失败 HTTP $code2：$(cat /tmp/upload-resp2.json)"
+                exit 1
+              fi
             else
               echo "::error::$platform 上传失败 HTTP $code：$(cat /tmp/upload-resp.json)"
               exit 1
