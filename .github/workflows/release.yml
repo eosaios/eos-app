@@ -247,7 +247,7 @@ jobs:
       - name: Download wingetcreate
         run: |
           Invoke-WebRequest -Uri "https://aka.ms/wingetcreate/latest" -OutFile wingetcreate.exe -UseBasicParsing
-          $ProgressPreference = "SilentlyContinue"
+          if (-not (Test-Path .\wingetcreate.exe)) { Write-Error "wingetcreate.exe download failed"; exit 1 }
 
       - name: Submit manifest update
         env:
@@ -255,7 +255,8 @@ jobs:
         run: |
           $VERSION = "${{ inputs.version || github.ref_name }}"
           $verNum = $VERSION.TrimStart("v")
-          wingetcreate.exe update EOSAIOS.EOSApp `
+          # pwsh 不搜当前目录，必须 .\ 显式相对路径调用
+          .\wingetcreate.exe update EOSAIOS.EOSApp `
             --version $verNum `
             --urls "https://github.com/${{ github.repository }}/releases/download/$VERSION/eos-app-setup-$VERSION.exe" `
             --token $env:WINGET_TOKEN `
