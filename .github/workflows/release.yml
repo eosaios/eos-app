@@ -18,11 +18,16 @@ on:
         description: "Core 构建 ref（默认 main）"
         required: false
         default: "main"
+      reuse_run_id:
+        description: "Windows 构建恢复：复用此已完成运行的 macOS/Linux 产物，仅重建 Windows（正常发版留空）"
+        required: false
+        default: ""
   push:
     tags: ["v*"]
 
 permissions:
   contents: write
+  actions: read
 
 env:
   CARGO_TERM_COLOR: always
@@ -34,19 +39,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          # macos-13（x86_64 runner）已退役：darwin/amd64 在 macos-latest（ARM）
-          # 上交叉编译（cargo --target / GOARCH=amd64 + clang -arch x86_64）。
-          - { goos: windows, goarch: amd64, runner: windows-latest, triple: x86_64-pc-windows-gnu }
-          - { goos: darwin, goarch: amd64, runner: macos-latest, triple: x86_64-apple-darwin }
-          - { goos: darwin, goarch: arm64, runner: macos-latest, triple: aarch64-apple-darwin }
-          # Linux 内核目标用 glibc（gnu）而非 musl：内核的截图能力依赖
-          # xcap → wayland/drm/gbm/pipewire 系统库（build.rs 走 pkg-config
-          # 探测，无 dlopen 逃生门），musl 静态目标下交叉探测必败；此前
-          # 全量编译从未真正成功过，全靠 rust-cache 侥幸命中。gnu 目标在
-          # 原生 runner 上系统库全通，且与桌面端 Go 侧（WebKitGTK 动态链）一致。
-          - { goos: linux, goarch: amd64, runner: ubuntu-latest, triple: x86_64-unknown-linux-gnu }
-          - { goos: linux, goarch: arm64, runner: ubuntu-24.04-arm, triple: aarch64-unknown-linux-gnu }
+        # 正常发版构建五目标；Windows 打包恢复只构建 Windows，复用其余四目标。
+        # macOS Intel 在 ARM runner 上交叉编译；Linux 使用 glibc 以支持截图系统库。
+        include: ${{ fromJSON(inputs.reuse_run_id != '' && '[{"goos":"windows","goarch":"amd64","runner":"windows-latest","triple":"x86_64-pc-windows-gnu"}]' || '[{"goos":"windows","goarch":"amd64","runner":"windows-latest","triple":"x86_64-pc-windows-gnu"},{"goos":"darwin","goarch":"amd64","runner":"macos-latest","triple":"x86_64-apple-darwin"},{"goos":"darwin","goarch":"arm64","runner":"macos-latest","triple":"aarch64-apple-darwin"},{"goos":"linux","goarch":"amd64","runner":"ubuntu-latest","triple":"x86_64-unknown-linux-gnu"},{"goos":"linux","goarch":"arm64","runner":"ubuntu-24.04-arm","triple":"aarch64-unknown-linux-gnu"}]') }}
 
     steps:
       # eos-app 的 go.mod replace github.com/eosaios/eos => ../eos-cli，
@@ -215,6 +210,29 @@ jobs:
           path: dist
           pattern: dist-*
           merge-multiple: true
+
+      - name: Download successful macOS and Linux artifacts
+        if: inputs.reuse_run_id != ''
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: dist-{darwin,linux}-*
+          merge-multiple: true
+          run-id: ${{ inputs.reuse_run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Verify complete distribution
+        env:
+          VERSION: ${{ inputs.version || github.ref_name }}
+        run: |
+          set -euo pipefail
+          VERNUM="${VERSION#v}"
+          for file in "eos-app-setup-$VERSION.exe" "eos-app_${VERNUM}_windows-amd64.zip" \
+            "eos-app_${VERNUM}_darwin-amd64.dmg" "eos-app_${VERNUM}_darwin-amd64.tar.gz" \
+            "eos-app_${VERNUM}_darwin-arm64.dmg" "eos-app_${VERNUM}_darwin-arm64.tar.gz" \
+            "eos-app_${VERNUM}_linux-amd64.tar.gz" "eos-app_${VERNUM}_linux-arm64.tar.gz"; do
+            [ -s "dist/$file" ] || { echo "::error::缺少发行产物 $file"; exit 1; }
+          done
 
       - name: Generate SHA256SUMS
         run: |
