@@ -120,6 +120,9 @@ jobs:
         run: |
           New-Item -ItemType Directory -Path windows-output
           $stage = (Resolve-Path payload).Path
+          # NSIS File directives require Windows separators on the native runner.
+          $nsi = Get-Content payload/todo-installer.nsi | ForEach-Object { if ($_ -match '^\s*File ') { $_.Replace('/', '\') } else { $_ } }
+          $nsi | Set-Content payload/todo-installer.nsi -Encoding utf8
           $out = Join-Path (Resolve-Path windows-output).Path "eos-todo_$($env:VERSION)_windows-amd64.exe"
           $numeric = ($env:VERSION -split '-')[0] + '.0'
           & 'C:\Program Files (x86)\NSIS\makensis.exe' /V2 "/DVERSION=$env:VERSION" "/DNUMERIC_VERSION=$numeric" "/DSTAGE=$stage" "/DICON=$stage\icon.ico" "/DOUTPUT=$out" payload/todo-installer.nsi
