@@ -110,7 +110,9 @@ def main():
                     'platform': platform, 'description': 'EOS Todo 桌面端'})
         if app['app_key'] != 'eos-todo' or app['platform'] != platform:
             raise ValueError('Version application identity mismatch')
-        existing = request('/api/v1/admin/version-management/versions?application_id=' + str(app['id']), token)['versions']
+        existing = request('/api/v1/admin/version-management/versions?application_id=' + str(app['id']), token)
+        if not isinstance(existing, list):
+            raise ValueError('Unexpected version-list response')
         matches = [v for v in existing if v['product_version'] == m['version']]
         if len(matches) > 1:
             raise ValueError('Duplicate candidate version')
