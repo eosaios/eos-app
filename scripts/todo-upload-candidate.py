@@ -26,11 +26,15 @@ def request(path, token=None, payload=None):
     headers = {'Content-Type': 'application/json'}
     if token:
         headers['Authorization'] = 'Bearer ' + token
-    base = ADMIN if path.startswith('/api/v1/admin/') else API
-    req = urllib.request.Request(base + path, headers=headers,
+    # The production admin reverse proxy serves the same backend catalogue;
+    # public API Cloudflare rules reject some hosted-runner requests.
+    req = urllib.request.Request(ADMIN + path, headers=headers,
                                  data=json.dumps(payload).encode() if payload is not None else None)
-    with CLIENT.open(req, timeout=60) as response:
-        return json.load(response)['data']
+    try:
+        with CLIENT.open(req, timeout=60) as response:
+            return json.load(response)['data']
+    except urllib.error.HTTPError as error:
+        raise RuntimeError(f'{req.method} {path}: HTTP {error.code}') from None
 
 
 def sha256(path):
