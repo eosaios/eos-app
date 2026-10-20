@@ -16,7 +16,7 @@ on:
         default: '0.1.0-beta.14'
       pro_ref:
         required: true
-        default: 'f91bb23'
+        default: 'release/todo-0.1.0-beta.14-20261020'
       base_ref:
         required: true
         default: '5320733fe0cbf0f5abb501443c7ee2a682550e9c'
@@ -72,6 +72,17 @@ jobs:
       - name: Build private Todo core
         working-directory: eos-core-rs
         run: cargo +1.93.1 build --release --locked -p eos-core-bin --bin eos-core-todo --features product-todo --target x86_64-unknown-linux-gnu
+      - uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            eos-core-rs/target
+          key: todo-linux-core-${{ inputs.core_ref }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: todo-linux-core
+          path: eos-core-rs/target/x86_64-unknown-linux-gnu/release/eos-core-todo
       - run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.17
       - working-directory: eos-todolist/frontend
         run: npm ci
@@ -93,11 +104,11 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.EOS_CORE_PAT }}
-        run: gh release download todo-candidate-0.1.0-beta.14-20261020 --repo eosaios/eos-todolist-pro --pattern windows-payload.zip --dir inputs
+        run: gh release download todo-candidate-0.1.0-beta.14-20261020 --repo eosaios/eos-todolist-pro --pattern windows-payload-v2.zip --dir inputs
       - name: Verify actual Windows executable and private core
         shell: pwsh
         run: |
-          Expand-Archive inputs/windows-payload.zip -DestinationPath payload
+          Expand-Archive inputs/windows-payload-v2.zip -DestinationPath payload
           python -c "import subprocess,json,pathlib; p=pathlib.Path('payload'); m=json.loads((p/'build-manifest.json').read_text()); i=json.loads(subprocess.check_output([str(p/'eos-todo.exe'),'--build-info'],timeout=20)); assert i['version']==m['version'] and i['environment']=='production' and i['api_origin']=='https://api.eosaios.com' and i['platform']=='windows-amd64'; v=json.loads(subprocess.check_output([str(p/'eos-todo.exe'),'--verify-package'],timeout=25)); assert v['passed']; print('Windows build identity and private core handshake passed')"
       - name: Package installer and verify extracted payload
         shell: pwsh
