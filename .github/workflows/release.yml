@@ -15,10 +15,10 @@ on:
         default: '39416514839'
       version:
         required: true
-        default: '1.0.0'
+        default: '1.0.1'
       pro_ref:
         required: true
-        default: 'release/todo-1.0.0-20261020'
+        default: 'release/todo-1.0.1-20261020'
       base_ref:
         required: true
         default: 'release/todo-1.0.0-20261020'
@@ -139,7 +139,7 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.EOS_CORE_PAT }}
-        run: gh release download todo-candidate-1.0.0-20261020 --repo eosaios/eos-todolist-pro --pattern windows-payload.zip --dir inputs
+        run: gh release download todo-candidate-${{ inputs.version }}-20261020 --repo eosaios/eos-todolist-pro --pattern windows-payload.zip --dir inputs
       - name: Verify actual Windows executable and private core
         shell: pwsh
         run: |
@@ -150,6 +150,8 @@ jobs:
         run: |
           & payload/account.test.exe "-test.v" "-test.timeout=120s"
           if ($LASTEXITCODE -ne 0) { throw 'Windows account tests failed' }
+          & payload/updater.test.exe "-test.v" "-test.timeout=120s"
+          if ($LASTEXITCODE -ne 0) { throw 'Windows updater reliability tests failed' }
           & payload/keyring.test.exe "-test.v" "-test.timeout=30s"
           if ($LASTEXITCODE -ne 0) { throw 'Windows credential tests failed' }
       - name: Package installer and verify extracted payload
@@ -208,8 +210,12 @@ jobs:
           mkdir -p candidate-assets/darwin-arm64 candidate-assets/linux-amd64 candidate-assets/windows-amd64
           gh run download "$LINUX_RUN" -R eosaios/eos-app --name todo-linux-amd64 --dir candidate-assets/linux-amd64
           gh run download "$WINDOWS_RUN" -R eosaios/eos-app --name todo-windows-amd64 --dir candidate-assets/windows-amd64
-          gh release download todo-candidate-1.0.0-20261020 -R eosaios/eos-todolist-pro --pattern 'eos-todo_*_darwin-arm64.dmg' --pattern mac-release-manifest.json --dir candidate-assets/darwin-arm64
+          gh release download todo-candidate-${{ inputs.version }}-20261020 -R eosaios/eos-todolist-pro --pattern 'eos-todo_*_darwin-arm64.dmg' --pattern mac-release-manifest.json --dir candidate-assets/darwin-arm64
           mv candidate-assets/darwin-arm64/mac-release-manifest.json candidate-assets/darwin-arm64/release-manifest.json
+      - name: Publish identical compiled download mirrors without changing latest
+        env:
+          GH_TOKEN: ${{ secrets.EOS_CORE_PAT }}
+        run: python3 scripts/todo-publish-mirror.py
       - name: Store as non-current production versions
         env:
           EOS_ADMIN_API_BASE: https://admin.eosaios.com
@@ -219,5 +225,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: todo-download-addresses
-          path: todo-downloads.json
+          path: |
+            todo-downloads.json
+            todo-mirror-proof.json
           if-no-files-found: error

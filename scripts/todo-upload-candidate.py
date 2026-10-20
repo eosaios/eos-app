@@ -50,7 +50,7 @@ def upload(manifest, root, app, token):
     boundary = 'eos-todo-' + uuid.uuid4().hex
     fields = {'application_id': str(app['id']), 'product_version': manifest['version'],
               'commit': manifest['pro']['commit'], 'platform': manifest['platform'], 'quality': 'beta' if '-' in manifest['version'] else 'stable',
-              'release_notes': '修复浏览器登录回跳状态，新增平台意见反馈，优化无可用更新提示。三平台验收中，门户未切换。', 'is_current': 'false'}
+              'release_notes': '完善直连更新：备用下载源测速择优、断点续传、弱网自动重试，以及准确的超时和中断提示。候选版本，门户未切换。', 'is_current': 'false'}
     body = bytearray()
     for name, value in fields.items():
         body.extend(f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"\r\n\r\n{value}\r\n'.encode())
