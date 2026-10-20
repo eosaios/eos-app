@@ -15,13 +15,13 @@ on:
         default: '39416514839'
       version:
         required: true
-        default: '0.1.0-beta.14'
+        default: '1.0.0'
       pro_ref:
         required: true
-        default: 'release/todo-0.1.0-beta.14-20261020'
+        default: 'release/todo-1.0.0-20261020'
       base_ref:
         required: true
-        default: '5320733fe0cbf0f5abb501443c7ee2a682550e9c'
+        default: 'release/todo-1.0.0-20261020'
       core_ref:
         required: true
         default: '07c218bf5f9796a5ec93a8a15f7f55d5b4e54b4a'
@@ -139,12 +139,19 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.EOS_CORE_PAT }}
-        run: gh release download todo-candidate-0.1.0-beta.14-20261020 --repo eosaios/eos-todolist-pro --pattern windows-payload-v2.zip --dir inputs
+        run: gh release download todo-candidate-1.0.0-20261020 --repo eosaios/eos-todolist-pro --pattern windows-payload.zip --dir inputs
       - name: Verify actual Windows executable and private core
         shell: pwsh
         run: |
-          Expand-Archive inputs/windows-payload-v2.zip -DestinationPath payload
+          Expand-Archive inputs/windows-payload.zip -DestinationPath payload
           python -c "import subprocess,json,pathlib; p=pathlib.Path('payload'); m=json.loads((p/'build-manifest.json').read_text()); i=json.loads(subprocess.check_output([str(p/'eos-todo.exe'),'--build-info'],timeout=20)); assert i['version']==m['version'] and i['environment']=='production' and i['api_origin']=='https://api.eosaios.com' and i['platform']=='windows-amd64'; v=json.loads(subprocess.check_output([str(p/'eos-todo.exe'),'--verify-package'],timeout=25)); assert v['passed']; print('Windows build identity and private core handshake passed')"
+      - name: Native Windows account flow and credential regression
+        shell: pwsh
+        run: |
+          & payload/account.test.exe -test.v -test.timeout=120s
+          if ($LASTEXITCODE -ne 0) { throw 'Windows account tests failed' }
+          & payload/keyring.test.exe -test.v -test.timeout=30s
+          if ($LASTEXITCODE -ne 0) { throw 'Windows credential tests failed' }
       - name: Package installer and verify extracted payload
         shell: pwsh
         env:
@@ -201,7 +208,7 @@ jobs:
           mkdir -p candidate-assets/darwin-arm64 candidate-assets/linux-amd64 candidate-assets/windows-amd64
           gh run download "$LINUX_RUN" -R eosaios/eos-app --name todo-linux-amd64 --dir candidate-assets/linux-amd64
           gh run download "$WINDOWS_RUN" -R eosaios/eos-app --name todo-windows-amd64 --dir candidate-assets/windows-amd64
-          gh release download todo-candidate-0.1.0-beta.14-20261020 -R eosaios/eos-todolist-pro --pattern 'eos-todo_*_darwin-arm64.dmg' --pattern mac-release-manifest.json --dir candidate-assets/darwin-arm64
+          gh release download todo-candidate-1.0.0-20261020 -R eosaios/eos-todolist-pro --pattern 'eos-todo_*_darwin-arm64.dmg' --pattern mac-release-manifest.json --dir candidate-assets/darwin-arm64
           mv candidate-assets/darwin-arm64/mac-release-manifest.json candidate-assets/darwin-arm64/release-manifest.json
       - name: Store as non-current production versions
         env:
