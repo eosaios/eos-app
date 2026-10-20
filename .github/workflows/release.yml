@@ -129,6 +129,26 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'NSIS packaging failed' }
           7z x $out -oextracted -y | Out-Null
           python -c "import subprocess,json,pathlib,hashlib; p=pathlib.Path('extracted'); m=json.loads(pathlib.Path('payload/build-manifest.json').read_text()); assert hashlib.sha256((p/'eos-todo.exe').read_bytes()).hexdigest()==m['binary_sha256']; assert json.loads(subprocess.check_output([str(p/'eos-todo.exe'),'--verify-package'],timeout=25))['passed']; f=next(pathlib.Path('windows-output').glob('*.exe')); m.update(file=f.name,file_size=f.stat().st_size,sha256=hashlib.sha256(f.read_bytes()).hexdigest(),runtime_verified=True,distribution_ready=True); pathlib.Path('windows-output/release-manifest.json').write_text(json.dumps(m,indent=2)+'\n'); print('NSIS extracted payload verified')"
+      - name: Native install, reinstall and uninstall smoke
+        shell: pwsh
+        timeout-minutes: 5
+        run: |
+          $installer = (Get-ChildItem windows-output/*.exe).FullName
+          $target = Join-Path $env:RUNNER_TEMP 'todo-install-smoke'
+          $marker = Join-Path $env:APPDATA 'todo-user-data-preservation-smoke.txt'
+          Set-Content $marker 'retain user data'
+          1..2 | ForEach-Object {
+            $p = Start-Process -FilePath $installer -ArgumentList @('/S', "/D=$target") -Wait -PassThru
+            if ($p.ExitCode -ne 0) { throw "Installer failed: $($p.ExitCode)" }
+            python -c "import subprocess,json; assert json.loads(subprocess.check_output([r'$target\eos-todo.exe','--verify-package'],timeout=25))['passed']"
+          }
+          $scheme = (Get-Item 'HKCU:\Software\Classes\eostodo\shell\open\command').GetValue('')
+          if (!$scheme.Contains("$target\eos-todo.exe")) { throw 'Login return protocol is not registered to installed Todo' }
+          $p = Start-Process -FilePath "$target\uninstall.exe" -ArgumentList '/S' -Wait -PassThru
+          Start-Sleep -Seconds 3
+          if (Test-Path "$target\eos-todo.exe") { throw 'Uninstall retained the executable' }
+          if (!(Test-Path $marker)) { throw 'User data was removed' }
+          Write-Output 'Install, reinstall, login protocol, private core and uninstall passed'
       - uses: actions/upload-artifact@v4
         with:
           name: todo-windows-amd64
