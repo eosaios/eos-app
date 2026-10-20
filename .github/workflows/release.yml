@@ -2,6 +2,15 @@ name: Todo candidate build (no portal promotion)
 on:
   workflow_dispatch:
     inputs:
+      mode:
+        required: true
+        default: linux
+        type: choice
+        options: [linux, windows, publish]
+      linux_run:
+        default: ''
+      windows_run:
+        default: ''
       version:
         required: true
         default: '0.1.0-beta.14'
@@ -18,6 +27,7 @@ permissions:
   contents: read
 jobs:
   linux:
+    if: inputs.mode == 'linux'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -74,4 +84,64 @@ jobs:
         with:
           name: todo-linux-amd64
           path: linux-output/*
+          if-no-files-found: error
+  windows:
+    if: inputs.mode == 'windows'
+    runs-on: windows-latest
+    steps:
+      - name: Download private cross-built payload
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.EOS_CORE_PAT }}
+        run: gh release download todo-candidate-0.1.0-beta.14-20261020 --repo eosaios/eos-todolist-pro --pattern windows-payload.zip --dir inputs
+      - name: Verify actual Windows executable and private core
+        shell: pwsh
+        run: |
+          Expand-Archive inputs/windows-payload.zip -DestinationPath payload
+          python -c "import subprocess,json,pathlib; p=pathlib.Path('payload'); m=json.loads((p/'build-manifest.json').read_text()); i=json.loads(subprocess.check_output([str(p/'eos-todo.exe'),'--build-info'],timeout=20)); assert i['version']==m['version'] and i['environment']=='production' and i['api_origin']=='https://api.eosaios.com' and i['platform']=='windows-amd64'; v=json.loads(subprocess.check_output([str(p/'eos-todo.exe'),'--verify-package'],timeout=25)); assert v['passed']; print('Windows build identity and private core handshake passed')"
+      - name: Package installer and verify extracted payload
+        shell: pwsh
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          New-Item -ItemType Directory -Path windows-output
+          $stage = (Resolve-Path payload).Path
+          $out = Join-Path (Resolve-Path windows-output).Path "eos-todo_$($env:VERSION)_windows-amd64.exe"
+          $numeric = ($env:VERSION -split '-')[0] + '.0'
+          & 'C:\Program Files (x86)\NSIS\makensis.exe' /V2 "/DVERSION=$env:VERSION" "/DNUMERIC_VERSION=$numeric" "/DSTAGE=$stage" "/DICON=$stage\icon.ico" "/DOUTPUT=$out" payload/todo-installer.nsi
+          if ($LASTEXITCODE -ne 0) { throw 'NSIS packaging failed' }
+          7z x $out -oextracted -y | Out-Null
+          python -c "import subprocess,json,pathlib,hashlib; p=pathlib.Path('extracted'); m=json.loads(pathlib.Path('payload/build-manifest.json').read_text()); assert hashlib.sha256((p/'eos-todo.exe').read_bytes()).hexdigest()==m['binary_sha256']; assert json.loads(subprocess.check_output([str(p/'eos-todo.exe'),'--verify-package'],timeout=25))['passed']; f=next(pathlib.Path('windows-output').glob('*.exe')); m.update(file=f.name,file_size=f.stat().st_size,sha256=hashlib.sha256(f.read_bytes()).hexdigest(),runtime_verified=True,distribution_ready=True); pathlib.Path('windows-output/release-manifest.json').write_text(json.dumps(m,indent=2)+'\n'); print('NSIS extracted payload verified')"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: todo-windows-amd64
+          path: windows-output/*
+          if-no-files-found: error
+  publish:
+    if: inputs.mode == 'publish'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Collect three verified candidates
+        env:
+          GH_TOKEN: ${{ secrets.EOS_CORE_PAT }}
+          LINUX_RUN: ${{ inputs.linux_run }}
+          WINDOWS_RUN: ${{ inputs.windows_run }}
+        run: |
+          set -euo pipefail
+          mkdir -p candidate-assets/darwin-arm64 candidate-assets/linux-amd64 candidate-assets/windows-amd64
+          gh run download "$LINUX_RUN" -R eosaios/eos-app --name todo-linux-amd64 --dir candidate-assets/linux-amd64
+          gh run download "$WINDOWS_RUN" -R eosaios/eos-app --name todo-windows-amd64 --dir candidate-assets/windows-amd64
+          gh release download todo-candidate-0.1.0-beta.14-20261020 -R eosaios/eos-todolist-pro --pattern 'eos-todo_*_darwin-arm64.dmg' --pattern mac-release-manifest.json --dir candidate-assets/darwin-arm64
+          mv candidate-assets/darwin-arm64/mac-release-manifest.json candidate-assets/darwin-arm64/release-manifest.json
+      - name: Store as non-current production versions
+        env:
+          EOS_ADMIN_API_BASE: ${{ secrets.EOS_ADMIN_API_BASE }}
+          EOS_ADMIN_EMAIL: ${{ secrets.EOS_ADMIN_EMAIL }}
+          EOS_ADMIN_PASSWORD: ${{ secrets.EOS_ADMIN_PASSWORD }}
+        run: python3 scripts/todo-upload-candidate.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: todo-download-addresses
+          path: todo-downloads.json
           if-no-files-found: error
