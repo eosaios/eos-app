@@ -62,7 +62,7 @@ def validate_response(version, manifest):
                 'file_size': manifest['file_size'], 'sha256_hash': manifest['sha256'], 'is_current': False}
     if any(version.get(key) != value for key, value in expected.items()):
         raise ValueError('Stored candidate differs from expected immutable metadata')
-    if not version['file_url'].startswith(API + '/storage/versions/'):
+    if not version['file_url'].startswith((API + '/storage/versions/', 'https://dl.eosaios.com/versions/')):
         raise ValueError('Unexpected candidate storage origin')
 
 
