@@ -36,7 +36,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Verify production version-management access without writes
         env:
-          EOS_ADMIN_API_BASE: https://api.eosaios.com
+          EOS_ADMIN_API_BASE: https://admin.eosaios.com
           EOS_ADMIN_EMAIL: ${{ secrets.EOS_ADMIN_EMAIL }}
           EOS_ADMIN_PASSWORD: ${{ secrets.EOS_ADMIN_PASSWORD }}
         run: python3 scripts/todo-upload-candidate.py --preflight
@@ -205,7 +205,7 @@ jobs:
           mv candidate-assets/darwin-arm64/mac-release-manifest.json candidate-assets/darwin-arm64/release-manifest.json
       - name: Store as non-current production versions
         env:
-          EOS_ADMIN_API_BASE: https://api.eosaios.com
+          EOS_ADMIN_API_BASE: https://admin.eosaios.com
           EOS_ADMIN_EMAIL: ${{ secrets.EOS_ADMIN_EMAIL }}
           EOS_ADMIN_PASSWORD: ${{ secrets.EOS_ADMIN_PASSWORD }}
         run: python3 scripts/todo-upload-candidate.py

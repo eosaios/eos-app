@@ -8,9 +8,10 @@ import sys
 import urllib.request
 import uuid
 
-API = os.environ.get('EOS_ADMIN_API_BASE', '').rstrip('/')
-if API != 'https://api.eosaios.com':
-    raise SystemExit('Production candidate upload requires the exact production API')
+API = 'https://api.eosaios.com'
+ADMIN = os.environ.get('EOS_ADMIN_API_BASE', '').rstrip('/')
+if ADMIN != 'https://admin.eosaios.com':
+    raise SystemExit('Production candidate upload requires the exact production admin origin')
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -25,7 +26,8 @@ def request(path, token=None, payload=None):
     headers = {'Content-Type': 'application/json'}
     if token:
         headers['Authorization'] = 'Bearer ' + token
-    req = urllib.request.Request(API + path, headers=headers,
+    base = ADMIN if path.startswith('/api/v1/admin/') else API
+    req = urllib.request.Request(base + path, headers=headers,
                                  data=json.dumps(payload).encode() if payload is not None else None)
     with CLIENT.open(req, timeout=60) as response:
         return json.load(response)['data']
@@ -51,7 +53,7 @@ def upload(manifest, root, app, token):
     body.extend(f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="{package.name}"\r\nContent-Type: application/octet-stream\r\n\r\n'.encode())
     body.extend(package.read_bytes())
     body.extend(f'\r\n--{boundary}--\r\n'.encode())
-    req = urllib.request.Request(API + '/api/v1/admin/version-management/versions/upload', data=body,
+    req = urllib.request.Request(ADMIN + '/api/v1/admin/version-management/versions/upload', data=body,
           headers={'Authorization': 'Bearer ' + token, 'Content-Type': 'multipart/form-data; boundary=' + boundary})
     with CLIENT.open(req, timeout=300) as response:
         return json.load(response)['data']
