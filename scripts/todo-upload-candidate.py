@@ -67,6 +67,12 @@ def validate_response(version, manifest):
 
 
 def main():
+    if sys.argv[1:] == ['--preflight']:
+        token = request('/api/v1/admin/auth/login', payload={'email': os.environ['EOS_ADMIN_EMAIL'],
+                        'password': os.environ['EOS_ADMIN_PASSWORD']})['access_token']
+        request('/api/v1/admin/version-management/applications', token)['applications']
+        print('Production version-management authentication and read access passed')
+        return
     manifests = list(pathlib.Path('candidate-assets').glob('*/release-manifest.json'))
     if len(manifests) != 3:
         raise ValueError('Exactly three platform manifests are required')
