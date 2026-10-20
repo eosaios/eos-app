@@ -11,6 +11,8 @@ on:
         default: ''
       windows_run:
         default: ''
+      reuse_core_run:
+        default: '39416514839'
       version:
         required: true
         default: '0.1.0-beta.14'
@@ -25,6 +27,7 @@ on:
         default: '07c218bf5f9796a5ec93a8a15f7f55d5b4e54b4a'
 permissions:
   contents: read
+  actions: read
 jobs:
   linux:
     if: inputs.mode == 'linux'
@@ -60,9 +63,11 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
-      - run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev libx11-dev libx11-xcb-dev libxtst-dev libxkbcommon-dev libxkbcommon-x11-dev pkg-config libpipewire-0.3-dev libdrm-dev libgbm-dev libwayland-dev libxdo-dev
+      - run: sudo apt-get update && sudo apt-get install -y xvfb xauth libgtk-4-dev libwebkitgtk-6.0-dev libx11-dev libx11-xcb-dev libxtst-dev libxkbcommon-dev libxkbcommon-x11-dev pkg-config libpipewire-0.3-dev libdrm-dev libgbm-dev libwayland-dev libxdo-dev
       - run: rustup toolchain install 1.93.1 --profile minimal
+        if: inputs.reuse_core_run == ''
       - uses: actions/cache@v4
+        if: inputs.reuse_core_run == ''
         with:
           path: |
             ~/.cargo/registry
@@ -70,15 +75,31 @@ jobs:
             eos-core-rs/target
           key: todo-linux-core-${{ inputs.core_ref }}
       - name: Build private Todo core
+        if: inputs.reuse_core_run == ''
         working-directory: eos-core-rs
         run: cargo +1.93.1 build --release --locked -p eos-core-bin --bin eos-core-todo --features product-todo --target x86_64-unknown-linux-gnu
       - uses: actions/cache/save@v4
+        if: inputs.reuse_core_run == ''
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
             eos-core-rs/target
           key: todo-linux-core-${{ inputs.core_ref }}
+      - name: Reuse immutable native core from this candidate build
+        if: inputs.reuse_core_run != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CORE_RUN: ${{ inputs.reuse_core_run }}
+          CORE_REF: ${{ inputs.core_ref }}
+        run: |
+          set -euo pipefail
+          test "$CORE_RUN" = 39416514839
+          test "$CORE_REF" = 07c218bf5f9796a5ec93a8a15f7f55d5b4e54b4a
+          mkdir -p eos-core-rs/target/x86_64-unknown-linux-gnu/release
+          gh run download "$CORE_RUN" -R eosaios/eos-app --name todo-linux-core --dir eos-core-rs/target/x86_64-unknown-linux-gnu/release
+          echo '2dfd28e5f9a9ff26f1929694f619bb1e4fa32b3659135e49512f75420d6ade4a  eos-core-rs/target/x86_64-unknown-linux-gnu/release/eos-core-todo' | sha256sum --check
+          chmod +x eos-core-rs/target/x86_64-unknown-linux-gnu/release/eos-core-todo
       - uses: actions/upload-artifact@v4
         with:
           name: todo-linux-core
@@ -90,7 +111,7 @@ jobs:
         working-directory: eos-todolist-pro
         env:
           VERSION: ${{ inputs.version }}
-        run: python3 scripts/build-platform.py --platform linux-amd64 --version "$VERSION" --base ../eos-todolist --core-source ../eos-core-rs --core ../eos-core-rs/target/x86_64-unknown-linux-gnu/release/eos-core-todo --output ../linux-output --test
+        run: xvfb-run -a python3 scripts/build-platform.py --platform linux-amd64 --version "$VERSION" --base ../eos-todolist --core-source ../eos-core-rs --core ../eos-core-rs/target/x86_64-unknown-linux-gnu/release/eos-core-todo --output ../linux-output --test
       - uses: actions/upload-artifact@v4
         with:
           name: todo-linux-amd64
