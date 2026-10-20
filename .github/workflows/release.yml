@@ -148,9 +148,9 @@ jobs:
       - name: Native Windows account flow and credential regression
         shell: pwsh
         run: |
-          & payload/account.test.exe -test.v -test.timeout=120s
+          & payload/account.test.exe "-test.v" "-test.timeout=120s"
           if ($LASTEXITCODE -ne 0) { throw 'Windows account tests failed' }
-          & payload/keyring.test.exe -test.v -test.timeout=30s
+          & payload/keyring.test.exe "-test.v" "-test.timeout=30s"
           if ($LASTEXITCODE -ne 0) { throw 'Windows credential tests failed' }
       - name: Package installer and verify extracted payload
         shell: pwsh
