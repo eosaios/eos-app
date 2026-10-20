@@ -41,6 +41,7 @@ def main():
         raise ValueError('Unexpected mirror platforms')
     if any(m['version'] != version for _, m in packages):
         raise ValueError('Mixed mirror versions')
+    latest_before = gh('api', f'repos/{REPO}/releases/latest', '--jq', '.tag_name').strip()
     tag = 'todo-mirror-v' + version
     existing = subprocess.run(['gh', 'release', 'view', tag, '--repo', REPO, '--json', 'assets,isDraft,isPrerelease'], text=True, capture_output=True)
     if existing.returncode:
@@ -72,6 +73,9 @@ def main():
             proof.append({'platform': m['platform'], 'version': version, 'sha256': m['sha256'],
                           'url': f'https://github.com/{REPO}/releases/download/{tag}/{package.name}',
                           'download_verified': True})
+    latest_after = gh('api', f'repos/{REPO}/releases/latest', '--jq', '.tag_name').strip()
+    if latest_before != latest_after:
+        raise ValueError('Public latest channel changed during mirror publication')
     pathlib.Path('todo-mirror-proof.json').write_text(json.dumps({'packages': proof, 'latest_unchanged': True}, indent=2) + '\n')
     print('Three published mirror downloads verified; no current-version promotion')
 
