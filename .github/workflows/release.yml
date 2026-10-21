@@ -6,7 +6,7 @@ on:
         required: true
         default: linux
         type: choice
-        options: [linux, windows, preflight, publish]
+        options: [linux, windows, preflight, publish, promote-1.0.1]
       linux_run:
         default: ''
       windows_run:
@@ -29,6 +29,22 @@ permissions:
   contents: read
   actions: read
 jobs:
+  promote:
+    if: inputs.mode == 'promote-1.0.1'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Promote explicitly authorized Todo 1.0.1 current versions
+        env:
+          EOS_ADMIN_API_BASE: https://admin.eosaios.com
+          EOS_ADMIN_EMAIL: ${{ secrets.EOS_ADMIN_EMAIL }}
+          EOS_ADMIN_PASSWORD: ${{ secrets.EOS_ADMIN_PASSWORD }}
+        run: python3 scripts/todo-promote-1.0.1.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: todo-current-promotion
+          path: todo-current-promotion.json
+          if-no-files-found: error
   preflight:
     if: inputs.mode == 'preflight'
     runs-on: ubuntu-24.04
