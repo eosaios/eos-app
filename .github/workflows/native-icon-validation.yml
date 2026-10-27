@@ -1,0 +1,51 @@
+name: Native icon validation
+on:
+  push:
+    branches: ['validation/desktop-*']
+permissions:
+  contents: read
+jobs:
+  native-icons:
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout desktop source
+        uses: actions/checkout@v4
+        with:
+          repository: eosaios/eos-app-src
+          ref: 486d4b5cd7af5072458c534708ed600d9786cfce
+          token: ${{ secrets.EOS_CORE_PAT }}
+          path: app
+      - name: Checkout wallpaper source
+        uses: actions/checkout@v4
+        with:
+          repository: eosaios/eos-wallpaper
+          ref: 91e189f8c6146c7c8a17d76a49698e11b1207d46
+          token: ${{ secrets.EOS_CORE_PAT }}
+          path: wallpaper
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.25'
+          cache: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - name: Check native compiler
+        run: |
+          xcodebuild -version
+          xcrun actool --version
+      - name: Compile desktop icon and verify legacy frames
+        working-directory: app
+        env:
+          EOS_REQUIRE_NATIVE_ICON_TEST: '1'
+          EOS_NATIVE_ICON_OUTPUT: ${{ github.workspace }}/native-icons/desktop
+        run: go test scripts/build_release.go scripts/build_release_test.go -v
+      - name: Compile wallpaper icon
+        run: |
+          node --test wallpaper/scripts/compile-macos-icon.test.mjs
+          node wallpaper/scripts/compile-macos-icon.mjs "$GITHUB_WORKSPACE/native-icons/wallpaper"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-icon-catalogs
+          path: native-icons/
+          if-no-files-found: error

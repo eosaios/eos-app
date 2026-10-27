@@ -1,387 +1,255 @@
-name: Release
-
-# EOS App 三端 Release 构建（Windows / macOS / Linux，五目标矩阵），
-# 产物与校验文件发布到本仓库 Release。
-
+name: Todo candidate build (no portal promotion)
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: "版本号（如 v1.0.0-beta.2，留空则拒绝）"
+      mode:
         required: true
-        default: ""
-      src_ref:
-        description: "App 源码 ref（默认 main）"
-        required: false
-        default: "main"
+        default: linux
+        type: choice
+        options: [linux, windows, preflight, publish, promote-1.0.1, promote-1.0.2]
+      linux_run:
+        default: ''
+      windows_run:
+        default: ''
+      reuse_core_run:
+        default: '39416514839'
+      version:
+        required: true
+        default: '1.0.1'
+      pro_ref:
+        required: true
+        default: 'release/todo-1.0.1-20261020'
+      base_ref:
+        required: true
+        default: 'release/todo-1.0.0-20261020'
       core_ref:
-        description: "Core 构建 ref（默认 main）"
-        required: false
-        default: "main"
-  push:
-    tags: ["v*"]
-
+        required: true
+        default: '07c218bf5f9796a5ec93a8a15f7f55d5b4e54b4a'
 permissions:
-  contents: write
-
-env:
-  CARGO_TERM_COLOR: always
-
+  contents: read
+  actions: read
 jobs:
-  build:
-    name: build (${{ matrix.goos }}/${{ matrix.goarch }})
-    runs-on: ${{ matrix.runner }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          # macos-13（x86_64 runner）已退役：darwin/amd64 在 macos-latest（ARM）
-          # 上交叉编译（cargo --target / GOARCH=amd64 + clang -arch x86_64）。
-          - { goos: windows, goarch: amd64, runner: windows-latest, triple: x86_64-pc-windows-gnu }
-          - { goos: darwin, goarch: amd64, runner: macos-latest, triple: x86_64-apple-darwin }
-          - { goos: darwin, goarch: arm64, runner: macos-latest, triple: aarch64-apple-darwin }
-          # Linux 内核目标用 glibc（gnu）而非 musl：内核的截图能力依赖
-          # xcap → wayland/drm/gbm/pipewire 系统库（build.rs 走 pkg-config
-          # 探测，无 dlopen 逃生门），musl 静态目标下交叉探测必败；此前
-          # 全量编译从未真正成功过，全靠 rust-cache 侥幸命中。gnu 目标在
-          # 原生 runner 上系统库全通，且与桌面端 Go 侧（WebKitGTK 动态链）一致。
-          - { goos: linux, goarch: amd64, runner: ubuntu-latest, triple: x86_64-unknown-linux-gnu }
-          - { goos: linux, goarch: arm64, runner: ubuntu-24.04-arm, triple: aarch64-unknown-linux-gnu }
-
-    steps:
-      # eos-app 的 go.mod replace github.com/eosaios/eos => ../eos-cli，
-      # 布局必须保持 app 与 eos-cli 同级。
-      - name: Checkout app source
-        uses: actions/checkout@v4
-        with:
-          repository: eosaios/eos-app-src
-          ref: ${{ inputs.src_ref || 'main' }}
-          token: ${{ secrets.EOS_CORE_PAT }}
-          path: app
-
-      - name: Checkout eos-cli (dependency)
-        uses: actions/checkout@v4
-        with:
-          repository: eosaios/eos
-          path: eos-cli
-
-      - name: Checkout core source
-        uses: actions/checkout@v4
-        with:
-          repository: eosaios/eos-core-rs
-          ref: ${{ inputs.core_ref || 'main' }}
-          token: ${{ secrets.EOS_CORE_PAT }}
-          path: eos-core-rs
-
-      - uses: actions/setup-go@v6
-        with:
-          go-version: "1.25"
-
-      - uses: actions/setup-node@v5
-        with:
-          node-version: "22"
-
-      - name: Install Rust target
-        run: rustup target add ${{ matrix.triple }}
-
-      - name: Install musl toolchain (linux musl)
-        if: contains(matrix.triple, 'musl')
-        run: sudo apt-get update && sudo apt-get install -y musl-tools
-
-      # Wails v3 beta.5 Linux 走 cgo，依赖 GTK4 + WebKitGTK 6.0（pkg-config 探测）。
-      # GTK/WebKit 供桌面端 Go 构建；pipewire/drm/gbm/wayland 头文件供内核
-      # xcap 截图链（wayland-sys/drm-sys/pipewire-sys 的 pkg-config 探测）。
-      - name: Install GTK/WebKit headers (linux)
-        if: matrix.goos == 'linux'
-        run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev pkg-config libpipewire-0.3-dev libdrm-dev libgbm-dev libwayland-dev libxdo-dev
-
-      # build_release.go 的 Windows syso 生成（图标/版本资源）依赖 wails3 CLI。
-      - name: Install wails3 CLI (windows)
-        if: matrix.goos == 'windows'
-        run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.5
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: eos-core-rs
-          key: ${{ matrix.triple }}
-
-      - name: Build sidecar (release)
-        working-directory: eos-core-rs
-        run: cargo build --release --target ${{ matrix.triple }} -p eos-core-bin
-
-      - name: Sign and package sidecar
-        shell: pwsh
-        working-directory: eos-core-rs
-        env:
-          EOS_SIGNING_KEY: ${{ secrets.EOS_SIGNING_KEY }}
-        run: |
-          if ([string]::IsNullOrWhiteSpace($env:EOS_SIGNING_KEY)) {
-            throw "EOS_SIGNING_KEY secret 未设置"
-          }
-          $exeName = if ("${{ matrix.goos }}" -eq "windows") { "eos-core.exe" } else { "eos-core" }
-          $built = "target/${{ matrix.triple }}/release/$exeName"
-          $staged = "target/release/$exeName"
-          New-Item -ItemType Directory -Force -Path (Split-Path $staged) | Out-Null
-          Copy-Item -Force $built $staged
-          New-Item -ItemType Directory -Force -Path scripts | Out-Null
-          [IO.File]::WriteAllText("$PWD/scripts/eos-signing-key.pem", $env:EOS_SIGNING_KEY)
-          & pwsh -NoProfile -File scripts/package-public-artifact.ps1 `
-            -Target "${{ matrix.triple }}" `
-            -PrivateKeyPath scripts/eos-signing-key.pem
-
-      - name: Verify sidecar sha256
-        shell: bash
-        run: |
-          set -euo pipefail
-          dest="eos-core-rs/pkg/coreapi/sidecar/core/${{ matrix.triple }}"
-          manifest_hash=$(python3 -c "import json; print(json.load(open('$dest/manifest.json'))['sha256'].replace('sha256:','').lower())" 2>/dev/null \
-            || jq -r '.sha256' "$dest/manifest.json" | sed 's/^sha256://' | tr 'A-Z' 'a-z')
-          bin_file=$(ls "$dest"/eos-core* | head -1)
-          actual_hash=$(sha256sum "$bin_file" | awk '{print $1}')
-          echo "manifest=$manifest_hash binary=$actual_hash"
-          [ "$manifest_hash" = "$actual_hash" ] || { echo "::error::sha256 不一致"; exit 1; }
-
-      - name: Stage sidecar into app core dir
-        shell: bash   # Windows runner 默认 shell 是 pwsh，bash 语法必须显式声明
-        run: |
-          set -euo pipefail
-          mkdir -p "app/core/${{ matrix.triple }}"
-          cp "eos-core-rs/pkg/coreapi/sidecar/core/${{ matrix.triple }}"/eos-core* "app/core/${{ matrix.triple }}/"
-          cp "eos-core-rs/pkg/coreapi/sidecar/core/${{ matrix.triple }}/manifest.json" "app/core/${{ matrix.triple }}/"
-
-      - name: Build release archive
-        shell: bash
-        working-directory: app
-        run: |
-          set -euo pipefail
-          VERSION="${{ inputs.version || github.ref_name }}"
-          [ -n "$VERSION" ] || { echo "::error::版本号为空"; exit 1; }
-          # 目标三元组显式下发（native runner 上与宿主一致；darwin/amd64 为交叉，
-          # wails darwin 走 cgo，需 CC 指定 -arch x86_64）。
-          export CGO_ENABLED=1 GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }}
-          if [ "${{ matrix.goos }}/${{ matrix.goarch }}" = "darwin/amd64" ]; then
-            export CC="clang -arch x86_64"
-          fi
-          go run ./scripts/build_release.go \
-            -version "$VERSION" \
-            -commit "$(git rev-parse HEAD)" \
-            -build-date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-            -out dist \
-            -targets ${{ matrix.goos }}/${{ matrix.goarch }}
-          ls -la dist
-
-      # Windows 安装器：Inno Setup（installer.iss 与历版 setup 同源）。
-      # 从 staging 取 exe（.iss 读 output\eos-app.exe），内核走已 staged 的
-      # core\x86_64-pc-windows-gnu\。pwsh 调 iscc——bash 下 /D 会被 MSYS
-      # 路径转换破坏。
-      - name: Build Windows installer (Inno Setup)
-        if: matrix.goos == 'windows'
-        shell: pwsh
-        working-directory: app
-        run: |
-          $version = "${{ inputs.version || github.ref_name }}"
-          if ([string]::IsNullOrWhiteSpace($version)) { throw "version 为空" }
-          # staging 目录名走 build_release.go 的 sanitizeVersion：剥前导 v + 非法字符转连字符
-          $dirVersion = $version.Trim().TrimStart('v')
-          if ([string]::IsNullOrWhiteSpace($dirVersion)) { $dirVersion = "dev" }
-          New-Item -ItemType Directory -Force -Path output | Out-Null
-          Copy-Item -Force "dist/eos-app_${dirVersion}_windows-amd64/eos-app.exe" "output/eos-app.exe"
-          & iscc "/DMyAppVersion=$version" installer.iss
-          if ($LASTEXITCODE -ne 0) { throw "iscc failed (exit $LASTEXITCODE)" }
-          Get-ChildItem dist
-
-      # build_release.go 会留下同名 staging 目录（exe+core 展开态），归档与
-      # 安装器都取完后清掉，防止污染 release 资产。
-      - name: Clean staging dirs
-        shell: bash
-        working-directory: app
-        run: rm -rf dist/eos-app_*/
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: dist-${{ matrix.goos }}-${{ matrix.goarch }}
-          path: app/dist/*
-          if-no-files-found: error
-
-  release:
-    name: Create GitHub Release
-    runs-on: ubuntu-latest
-    needs: build
+  promote:
+    if: inputs.mode == 'promote-1.0.1' || inputs.mode == 'promote-1.0.2'
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/download-artifact@v4
-        with:
-          path: dist
-          pattern: dist-*
-          merge-multiple: true
-
-      - name: Generate SHA256SUMS
-        run: |
-          cd dist
-          sha256sum * > SHA256SUMS.txt
-          cat SHA256SUMS.txt
-
-      - name: Create release
+      - name: Promote explicitly authorized Todo 1.0.1 current versions
+        if: inputs.mode == 'promote-1.0.1'
         env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          VERSION="${{ inputs.version || github.ref_name }}"
-          NOTES_FILE="docs/releases/$VERSION.md"
-          [ -s "$NOTES_FILE" ] || { echo "::error::缺少发布说明 $NOTES_FILE"; exit 1; }
-          gh release create "$VERSION" dist/* \
-            --title "EOS App $VERSION" \
-            --notes-file "$NOTES_FILE" \
-            --repo "$GITHUB_REPOSITORY"
-
-  winget:
-    # 发版后自动向 microsoft/winget-pkgs 提 manifest 更新 PR。
-    # 前置：仓库 Settings → Secrets → 新建 WINGET_TOKEN（classic PAT，
-    # 勾选 public_repo；用提交 winget PR 的 GitHub 账号生成，
-    # 注意 PAT 过期后本 job 会失败，需要换新）。
-    # 首次手动提交的 manifest 合并前，明确跳过更新并在摘要中说明。
-    # WebView2 依赖（Microsoft.Edge.WebView2Runtime）暂不能声明：
-    # winget-pkgs 策略不允许新版包带依赖，待包发布后单独提 PR 追加。
-    name: Submit to winget-pkgs
-    runs-on: windows-latest
-    needs: release
-    if: ${{ vars.WINGET_SUBMIT != 'off' }}
-    steps:
-      - name: Check package availability
-        id: package
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          $response = Invoke-WebRequest -Uri "https://api.github.com/repos/microsoft/winget-pkgs/contents/manifests/e/EOSAIOS/EOSApp" -Headers @{ Authorization = "Bearer $env:GH_TOKEN" } -SkipHttpErrorCheck
-          if ($response.StatusCode -eq 404) {
-            "available=false" >> $env:GITHUB_OUTPUT
-            "WinGet initial package is awaiting moderator approval: https://github.com/microsoft/winget-pkgs/pull/447303. No update was submitted." >> $env:GITHUB_STEP_SUMMARY
-          } elseif ($response.StatusCode -eq 200) {
-            "available=true" >> $env:GITHUB_OUTPUT
-          } else {
-            throw "WinGet package lookup failed: HTTP $($response.StatusCode)"
-          }
-
-      - name: Download wingetcreate
-        if: steps.package.outputs.available == 'true'
-        run: |
-          Invoke-WebRequest -Uri "https://aka.ms/wingetcreate/latest" -OutFile wingetcreate.exe -UseBasicParsing
-          if (-not (Test-Path .\wingetcreate.exe)) { Write-Error "wingetcreate.exe download failed"; exit 1 }
-
-      - name: Submit manifest update
-        if: steps.package.outputs.available == 'true'
-        env:
-          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
-        run: |
-          $VERSION = "${{ inputs.version || github.ref_name }}"
-          $verNum = $VERSION.TrimStart("v")
-          # pwsh 不搜当前目录，必须 .\ 显式相对路径调用
-          .\wingetcreate.exe update EOSAIOS.EOSApp `
-            --version $verNum `
-            --urls "https://github.com/${{ github.repository }}/releases/download/$VERSION/eos-app-setup-$VERSION.exe" `
-            --token $env:WINGET_TOKEN `
-            --submit
-
-  admin-upload:
-    # 发版后把五个平台安装包同步到管理后台版本管理（默认
-    # https://api.eosaios.com），客户端更新检查的后台源以这里的
-    # is_current 为权威（发布/回滚/灰度开关）。与 GitHub Release 双渠道
-    # 保持同步全靠本 job，手动传后台仅作补漏。
-    # 前置：仓库 Settings → Secrets 配三个值：
-    #   EOS_ADMIN_API_BASE  形如 https://api.eosaios.com（不带尾斜杠）
-    #   EOS_ADMIN_EMAIL     CI 专用管理账号邮箱
-    #   EOS_ADMIN_PASSWORD  该账号密码
-    # 开关：仓库 Variables 设 ADMIN_UPLOAD=off 可停用（发版事故隔离用）。
-    # 同 (应用,平台,通道,版本) 重复上传返回 409，视为已同步打 WARNING 继续；
-    # 其余非 200 直接 fail。
-    name: Sync to admin version management
-    runs-on: ubuntu-latest
-    needs: release
-    if: ${{ vars.ADMIN_UPLOAD != 'off' }}
-    steps:
-      - name: Upload assets to version management
-        env:
-          GH_TOKEN: ${{ github.token }}
-          EOS_ADMIN_API_BASE: ${{ secrets.EOS_ADMIN_API_BASE }}
+          EOS_ADMIN_API_BASE: https://admin.eosaios.com
           EOS_ADMIN_EMAIL: ${{ secrets.EOS_ADMIN_EMAIL }}
           EOS_ADMIN_PASSWORD: ${{ secrets.EOS_ADMIN_PASSWORD }}
+        run: python3 scripts/todo-promote-1.0.1.py
+      - name: Promote explicitly authorized Todo 1.0.2 current versions
+        if: inputs.mode == 'promote-1.0.2'
+        env:
+          EOS_ADMIN_API_BASE: https://admin.eosaios.com
+          EOS_ADMIN_EMAIL: ${{ secrets.EOS_ADMIN_EMAIL }}
+          EOS_ADMIN_PASSWORD: ${{ secrets.EOS_ADMIN_PASSWORD }}
+        run: python3 scripts/todo-promote-1.0.2.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: todo-current-promotion
+          path: todo-current-promotion.json
+          if-no-files-found: error
+  preflight:
+    if: inputs.mode == 'preflight'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify production version-management access without writes
+        env:
+          EOS_ADMIN_API_BASE: https://admin.eosaios.com
+          EOS_ADMIN_EMAIL: ${{ secrets.EOS_ADMIN_EMAIL }}
+          EOS_ADMIN_PASSWORD: ${{ secrets.EOS_ADMIN_PASSWORD }}
+        run: python3 scripts/todo-upload-candidate.py --preflight
+  linux:
+    if: inputs.mode == 'linux'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: eosaios/eos-todolist-pro
+          ref: ${{ inputs.pro_ref }}
+          token: ${{ secrets.EOS_CORE_PAT }}
+          path: eos-todolist-pro
+      - uses: actions/checkout@v4
+        with:
+          repository: eosaios/eos-todolist
+          ref: ${{ inputs.base_ref }}
+          token: ${{ secrets.EOS_CORE_PAT }}
+          path: eos-todolist
+      - uses: actions/checkout@v4
+        with:
+          repository: eosaios/eos-core-rs
+          ref: ${{ inputs.core_ref }}
+          token: ${{ secrets.EOS_CORE_PAT }}
+          path: eos-core-rs
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.26.3'
+          cache-dependency-path: eos-todolist-pro/go.sum
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: eos-todolist/frontend/package-lock.json
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - run: sudo apt-get update && sudo apt-get install -y xvfb xauth libgtk-4-dev libwebkitgtk-6.0-dev libx11-dev libx11-xcb-dev libxtst-dev libxkbcommon-dev libxkbcommon-x11-dev pkg-config libpipewire-0.3-dev libdrm-dev libgbm-dev libwayland-dev libxdo-dev
+      - run: rustup toolchain install 1.93.1 --profile minimal
+        if: inputs.reuse_core_run == ''
+      - uses: actions/cache@v4
+        if: inputs.reuse_core_run == ''
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            eos-core-rs/target
+          key: todo-linux-core-${{ inputs.core_ref }}
+      - name: Build private Todo core
+        if: inputs.reuse_core_run == ''
+        working-directory: eos-core-rs
+        run: cargo +1.93.1 build --release --locked -p eos-core-bin --bin eos-core-todo --features product-todo --target x86_64-unknown-linux-gnu
+      - uses: actions/cache/save@v4
+        if: inputs.reuse_core_run == ''
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            eos-core-rs/target
+          key: todo-linux-core-${{ inputs.core_ref }}
+      - name: Reuse immutable native core from this candidate build
+        if: inputs.reuse_core_run != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CORE_RUN: ${{ inputs.reuse_core_run }}
+          CORE_REF: ${{ inputs.core_ref }}
         run: |
           set -euo pipefail
-          VERSION="${{ inputs.version || github.ref_name }}"
-          VERNUM="${VERSION#v}"
-          case "$VERSION" in *-beta*|*-rc*) QUALITY=beta ;; *) QUALITY=stable ;; esac
-          API="${EOS_ADMIN_API_BASE%/}"
-          AUTH="Authorization: Bearer $(curl -fsS "$API/api/v1/admin/auth/login" \
-            -H 'Content-Type: application/json' \
-            -d "{\"email\":\"$EOS_ADMIN_EMAIL\",\"password\":\"$EOS_ADMIN_PASSWORD\"}" \
-            | jq -r '.data.access_token')"
-
-          gh release download "$VERSION" --repo "$GITHUB_REPOSITORY" --dir assets \
-            --pattern "eos-app-setup-$VERSION.exe" \
-            --pattern "eos-app_${VERNUM}_darwin-amd64.dmg" \
-            --pattern "eos-app_${VERNUM}_darwin-arm64.dmg" \
-            --pattern "eos-app_${VERNUM}_linux-amd64.tar.gz" \
-            --pattern "eos-app_${VERNUM}_linux-arm64.tar.gz"
-          ls -la assets/
-
-          NOTES=$(gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" --json body -q .body)
-          COMMIT="${{ inputs.src_ref || github.sha }}"
-
-          ensure_application() {
-            local platform="$1" display="$2" name="eos-app-$1" id
-            id=$(curl -fsS "$API/api/v1/admin/version-management/applications" -H "$AUTH" \
-              | jq -r --arg n "$name" '[.data.applications[] | select(.name==$n) | .id][0] // empty')
-            if [ -z "$id" ]; then
-              id=$(curl -fsS -X POST "$API/api/v1/admin/version-management/applications" \
-                -H "$AUTH" -H 'Content-Type: application/json' \
-                -d "{\"name\":\"$name\",\"app_key\":\"eos-app\",\"display_name\":\"$display\",\"platform\":\"$platform\",\"description\":\"EOS 桌面端\"}" \
-                | jq -r '.data.id')
-              echo "created application $name (id=$id)"
-            fi
-            echo "$id"
+          test "$CORE_RUN" = 39416514839
+          test "$CORE_REF" = 07c218bf5f9796a5ec93a8a15f7f55d5b4e54b4a
+          mkdir -p eos-core-rs/target/x86_64-unknown-linux-gnu/release
+          gh run download "$CORE_RUN" -R eosaios/eos-app --name todo-linux-core --dir eos-core-rs/target/x86_64-unknown-linux-gnu/release
+          echo '2dfd28e5f9a9ff26f1929694f619bb1e4fa32b3659135e49512f75420d6ade4a  eos-core-rs/target/x86_64-unknown-linux-gnu/release/eos-core-todo' | sha256sum --check
+          chmod +x eos-core-rs/target/x86_64-unknown-linux-gnu/release/eos-core-todo
+      - uses: actions/upload-artifact@v4
+        with:
+          name: todo-linux-core
+          path: eos-core-rs/target/x86_64-unknown-linux-gnu/release/eos-core-todo
+      - run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.17
+      - working-directory: eos-todolist/frontend
+        run: npm ci
+      - name: Build and verify production candidate
+        working-directory: eos-todolist-pro
+        env:
+          VERSION: ${{ inputs.version }}
+        run: xvfb-run -a python3 scripts/build-platform.py --platform linux-amd64 --version "$VERSION" --base ../eos-todolist --core-source ../eos-core-rs --core ../eos-core-rs/target/x86_64-unknown-linux-gnu/release/eos-core-todo --output ../linux-output --test
+      - uses: actions/upload-artifact@v4
+        with:
+          name: todo-linux-amd64
+          path: linux-output/*
+          if-no-files-found: error
+  windows:
+    if: inputs.mode == 'windows'
+    runs-on: windows-latest
+    steps:
+      - name: Install NSIS
+        shell: pwsh
+        run: choco install nsis --no-progress -y
+      - name: Download private cross-built payload
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.EOS_CORE_PAT }}
+        run: gh release download todo-candidate-${{ inputs.version }}-20261020 --repo eosaios/eos-todolist-pro --pattern windows-payload.zip --dir inputs
+      - name: Verify actual Windows executable and private core
+        shell: pwsh
+        run: |
+          Expand-Archive inputs/windows-payload.zip -DestinationPath payload
+          python -c "import subprocess,json,pathlib; p=pathlib.Path('payload'); m=json.loads((p/'build-manifest.json').read_text()); i=json.loads(subprocess.check_output([str(p/'eos-todo.exe'),'--build-info'],timeout=20)); assert i['version']==m['version'] and i['environment']=='production' and i['api_origin']=='https://api.eosaios.com' and i['platform']=='windows-amd64'; v=json.loads(subprocess.check_output([str(p/'eos-todo.exe'),'--verify-package'],timeout=25)); assert v['passed']; print('Windows build identity and private core handshake passed')"
+      - name: Native Windows account flow and credential regression
+        shell: pwsh
+        run: |
+          & payload/account.test.exe "-test.v" "-test.timeout=120s"
+          if ($LASTEXITCODE -ne 0) { throw 'Windows account tests failed' }
+          & payload/updater.test.exe "-test.v" "-test.timeout=120s"
+          if ($LASTEXITCODE -ne 0) { throw 'Windows updater reliability tests failed' }
+          & payload/keyring.test.exe "-test.v" "-test.timeout=30s"
+          if ($LASTEXITCODE -ne 0) { throw 'Windows credential tests failed' }
+      - name: Package installer and verify extracted payload
+        shell: pwsh
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          New-Item -ItemType Directory -Path windows-output
+          $stage = (Resolve-Path payload).Path
+          # NSIS File directives require Windows separators on the native runner.
+          $nsi = Get-Content payload/todo-installer.nsi | ForEach-Object { if ($_ -match '^\s*File ') { $_.Replace('/', '\') } else { $_ } }
+          $nsi | Set-Content payload/todo-installer.nsi -Encoding utf8
+          $out = Join-Path (Resolve-Path windows-output).Path "eos-todo_$($env:VERSION)_windows-amd64.exe"
+          $numeric = ($env:VERSION -split '-')[0] + '.0'
+          & 'C:\Program Files (x86)\NSIS\makensis.exe' /V2 "/DVERSION=$env:VERSION" "/DNUMERIC_VERSION=$numeric" "/DSTAGE=$stage" "/DICON=$stage\icon.ico" "/DOUTPUT=$out" payload/todo-installer.nsi
+          if ($LASTEXITCODE -ne 0) { throw 'NSIS packaging failed' }
+          7z x $out -oextracted -y | Out-Null
+          python -c "import subprocess,json,pathlib,hashlib; p=pathlib.Path('extracted'); m=json.loads(pathlib.Path('payload/build-manifest.json').read_text()); assert hashlib.sha256((p/'eos-todo.exe').read_bytes()).hexdigest()==m['binary_sha256']; assert json.loads(subprocess.check_output([str(p/'eos-todo.exe'),'--verify-package'],timeout=25))['passed']; f=next(pathlib.Path('windows-output').glob('*.exe')); m.update(file=f.name,file_size=f.stat().st_size,sha256=hashlib.sha256(f.read_bytes()).hexdigest(),runtime_verified=True,distribution_ready=True); pathlib.Path('windows-output/release-manifest.json').write_text(json.dumps(m,indent=2)+'\n'); print('NSIS extracted payload verified')"
+      - name: Native install, reinstall and uninstall smoke
+        shell: pwsh
+        timeout-minutes: 5
+        run: |
+          $installer = (Get-ChildItem windows-output/*.exe).FullName
+          $target = Join-Path $env:RUNNER_TEMP 'todo-install-smoke'
+          $marker = Join-Path $env:APPDATA 'todo-user-data-preservation-smoke.txt'
+          Set-Content $marker 'retain user data'
+          1..2 | ForEach-Object {
+            $p = Start-Process -FilePath $installer -ArgumentList @('/S', "/D=$target") -Wait -PassThru
+            if ($p.ExitCode -ne 0) { throw "Installer failed: $($p.ExitCode)" }
+            python -c "import subprocess,json; assert json.loads(subprocess.check_output([r'$target\eos-todo.exe','--verify-package'],timeout=25))['passed']"
           }
-
-          upload_asset() {
-            local platform="$1" display="$2" file="$3" app_id code
-            app_id=$(ensure_application "$platform" "$display")
-            code=$(curl -s -o /tmp/upload-resp.json -w '%{http_code}' \
-              -X POST "$API/api/v1/admin/version-management/versions/upload" -H "$AUTH" \
-              -F "application_id=$app_id" -F "product_version=$VERNUM" -F "commit=$COMMIT" \
-              -F "platform=$platform" -F "quality=$QUALITY" -F "release_notes=$NOTES" \
-              -F "is_current=true" -F "file=@assets/$file")
-            if [ "$code" = "200" ]; then
-              echo "uploaded $platform <- $file (quality=$QUALITY)"
-            elif [ "$code" = "409" ]; then
-              # 同版本覆盖发版：删旧行（连带存储对象）后重传，内容与 is_current 全量刷新
-              OLD_ID=$(curl -fsS "$API/api/v1/admin/version-management/versions?application_id=$app_id" -H "$AUTH" \
-                | jq -r --arg v "$VERNUM" '[.data[] | select(.product_version==$v) | .id][0] // empty')
-              if [ -z "$OLD_ID" ]; then
-                echo "::error::$platform 409 但找不到已有版本行，人工检查"
-                exit 1
-              fi
-              curl -fsS -X DELETE "$API/api/v1/admin/version-management/versions/$OLD_ID" -H "$AUTH" >/dev/null
-              code2=$(curl -s -o /tmp/upload-resp2.json -w '%{http_code}' -X POST \
-                "$API/api/v1/admin/version-management/versions/upload" -H "$AUTH" \
-                -F "application_id=$app_id" -F "product_version=$VERNUM" -F "commit=$COMMIT" \
-                -F "platform=$platform" -F "quality=$QUALITY" -F "release_notes=$NOTES" \
-                -F "is_current=true" -F "file=@assets/$file")
-              if [ "$code2" = "200" ]; then
-                echo "replaced $platform $VERNUM (was 409, deleted and re-uploaded)"
-              else
-                echo "::error::$platform 覆盖重传失败 HTTP $code2：$(cat /tmp/upload-resp2.json)"
-                exit 1
-              fi
-            else
-              echo "::error::$platform 上传失败 HTTP $code：$(cat /tmp/upload-resp.json)"
-              exit 1
-            fi
-          }
-
-          upload_asset windows-amd64 "EOS App (Windows x64)" "eos-app-setup-$VERSION.exe"
-          upload_asset darwin-amd64 "EOS App (macOS Intel)" "eos-app_${VERNUM}_darwin-amd64.dmg"
-          upload_asset darwin-arm64 "EOS App (macOS Apple Silicon)" "eos-app_${VERNUM}_darwin-arm64.dmg"
-          upload_asset linux-amd64 "EOS App (Linux x64)" "eos-app_${VERNUM}_linux-amd64.tar.gz"
-          upload_asset linux-arm64 "EOS App (Linux ARM64)" "eos-app_${VERNUM}_linux-arm64.tar.gz"
-          echo "admin sync done: $VERNUM (quality=$QUALITY)"
-
+          $scheme = (Get-Item 'HKCU:\Software\Classes\eostodo\shell\open\command').GetValue('')
+          if (!$scheme.Contains("$target\eos-todo.exe")) { throw 'Login return protocol is not registered to installed Todo' }
+          $p = Start-Process -FilePath "$target\uninstall.exe" -ArgumentList '/S' -Wait -PassThru
+          Start-Sleep -Seconds 3
+          if (Test-Path "$target\eos-todo.exe") { throw 'Uninstall retained the executable' }
+          if (!(Test-Path $marker)) { throw 'User data was removed' }
+          Write-Output 'Install, reinstall, login protocol, private core and uninstall passed'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: todo-windows-amd64
+          path: windows-output/*
+          if-no-files-found: error
+  publish:
+    if: inputs.mode == 'publish'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Collect three verified candidates
+        env:
+          GH_TOKEN: ${{ secrets.EOS_CORE_PAT }}
+          LINUX_RUN: ${{ inputs.linux_run }}
+          WINDOWS_RUN: ${{ inputs.windows_run }}
+        run: |
+          set -euo pipefail
+          mkdir -p candidate-assets/darwin-arm64 candidate-assets/linux-amd64 candidate-assets/windows-amd64
+          gh run download "$LINUX_RUN" -R eosaios/eos-app --name todo-linux-amd64 --dir candidate-assets/linux-amd64
+          gh run download "$WINDOWS_RUN" -R eosaios/eos-app --name todo-windows-amd64 --dir candidate-assets/windows-amd64
+          gh release download todo-candidate-${{ inputs.version }}-20261020 -R eosaios/eos-todolist-pro --pattern 'eos-todo_*_darwin-arm64.dmg' --pattern mac-release-manifest.json --dir candidate-assets/darwin-arm64
+          mv candidate-assets/darwin-arm64/mac-release-manifest.json candidate-assets/darwin-arm64/release-manifest.json
+      - name: Publish identical compiled download mirrors without changing latest
+        env:
+          GH_TOKEN: ${{ secrets.EOS_CORE_PAT }}
+        run: python3 scripts/todo-publish-mirror.py
+      - name: Store as non-current production versions
+        env:
+          EOS_ADMIN_API_BASE: https://admin.eosaios.com
+          EOS_ADMIN_EMAIL: ${{ secrets.EOS_ADMIN_EMAIL }}
+          EOS_ADMIN_PASSWORD: ${{ secrets.EOS_ADMIN_PASSWORD }}
+        run: python3 scripts/todo-upload-candidate.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: todo-download-addresses
+          path: |
+            todo-downloads.json
+            todo-mirror-proof.json
+          if-no-files-found: error
