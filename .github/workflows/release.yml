@@ -27,10 +27,15 @@ on:
         description: "Core 构建 ref（默认 main）"
         required: false
         default: "main"
-      build_target:
-        description: "构建目标；事故修复可先验收 Mac Apple Silicon"
+      channel:
+        description: "候选包通道；Beta 当前仅发布 Mac Apple Silicon"
         type: choice
-        options: [all, darwin-arm64]
+        options: [stable, beta]
+        default: stable
+      build_target:
+        description: "构建目标；remaining-stable 保留已验收的 Mac ARM 包"
+        type: choice
+        options: [all, darwin-arm64, remaining-stable]
         default: all
       reuse_run_id:
         description: "Windows 构建恢复：复用此已完成运行的 macOS/Linux 产物，仅重建 Windows（正常发版留空）"
@@ -55,10 +60,25 @@ jobs:
       fail-fast: false
       matrix:
         # 正常发版构建五目标；Windows 打包恢复只构建 Windows，复用其余四目标。
-        # macOS Intel 在 ARM runner 上交叉编译；Linux 使用 glibc 以支持截图系统库。
-        include: ${{ fromJSON(inputs.build_target == 'darwin-arm64' && '[{"goos":"darwin","goarch":"arm64","runner":"macos-latest","triple":"aarch64-apple-darwin"}]' || inputs.reuse_run_id != '' && '[{"goos":"windows","goarch":"amd64","runner":"windows-latest","triple":"x86_64-pc-windows-gnu"}]' || '[{"goos":"windows","goarch":"amd64","runner":"windows-latest","triple":"x86_64-pc-windows-gnu"},{"goos":"darwin","goarch":"amd64","runner":"macos-latest","triple":"x86_64-apple-darwin"},{"goos":"darwin","goarch":"arm64","runner":"macos-latest","triple":"aarch64-apple-darwin"},{"goos":"linux","goarch":"amd64","runner":"ubuntu-latest","triple":"x86_64-unknown-linux-gnu"},{"goos":"linux","goarch":"arm64","runner":"ubuntu-24.04-arm","triple":"aarch64-unknown-linux-gnu"}]') }}
+        # macOS Intel 使用 Intel runner 执行旧配置升级验收；Linux 使用 glibc 支持截图系统库。
+        include: ${{ fromJSON(inputs.build_target == 'darwin-arm64' && '[{"goos":"darwin","goarch":"arm64","runner":"macos-latest","triple":"aarch64-apple-darwin"}]' || inputs.build_target == 'remaining-stable' && '[{"goos":"windows","goarch":"amd64","runner":"windows-latest","triple":"x86_64-pc-windows-gnu"},{"goos":"darwin","goarch":"amd64","runner":"macos-26-intel","triple":"x86_64-apple-darwin"},{"goos":"linux","goarch":"amd64","runner":"ubuntu-latest","triple":"x86_64-unknown-linux-gnu"},{"goos":"linux","goarch":"arm64","runner":"ubuntu-24.04-arm","triple":"aarch64-unknown-linux-gnu"}]' || inputs.reuse_run_id != '' && '[{"goos":"windows","goarch":"amd64","runner":"windows-latest","triple":"x86_64-pc-windows-gnu"}]' || '[{"goos":"windows","goarch":"amd64","runner":"windows-latest","triple":"x86_64-pc-windows-gnu"},{"goos":"darwin","goarch":"amd64","runner":"macos-26-intel","triple":"x86_64-apple-darwin"},{"goos":"darwin","goarch":"arm64","runner":"macos-latest","triple":"aarch64-apple-darwin"},{"goos":"linux","goarch":"amd64","runner":"ubuntu-latest","triple":"x86_64-unknown-linux-gnu"},{"goos":"linux","goarch":"arm64","runner":"ubuntu-24.04-arm","triple":"aarch64-unknown-linux-gnu"}]') }}
 
     steps:
+      - name: Validate candidate channel
+        shell: bash
+        env:
+          CHANNEL: ${{ inputs.channel || 'stable' }}
+          VERSION: ${{ inputs.version || github.ref_name }}
+          BUILD_TARGET: ${{ inputs.build_target || 'all' }}
+          PUBLISH: ${{ inputs.publish }}
+        run: |
+          set -euo pipefail
+          if [ "$CHANNEL" = beta ]; then
+            [[ "$VERSION" == *-beta.* && "$BUILD_TARGET" = darwin-arm64 && "$PUBLISH" != true ]] || { echo "::error::Beta requires its Mac candidate target and publish=false"; exit 1; }
+          else
+            [[ "$VERSION" != *-* ]] || { echo "::error::Stable version cannot be a prerelease"; exit 1; }
+          fi
+
       # eos-app 的 go.mod replace github.com/eosaios/eos => ../eos-cli，
       # 布局必须保持 app 与 eos-cli 同级。
       - name: Checkout app source
@@ -180,6 +200,7 @@ jobs:
             export CC="clang -arch x86_64"
           fi
           go run ./scripts/build_release.go \
+            -channel "${{ inputs.channel || 'stable' }}" \
             -version "$VERSION" \
             -commit "$(git rev-parse HEAD)" \
             -build-date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
@@ -245,6 +266,31 @@ jobs:
           test -x "$XDG_DATA_HOME/eos-app/eos-app"
           test "$(xdg-mime query default x-scheme-handler/eosagent)" = eos-app.desktop
           grep -F 'MimeType=x-scheme-handler/eosagent;' "$XDG_DATA_HOME/applications/eos-app.desktop"
+
+      - name: Verify packaged legacy upgrade and restart
+        shell: bash
+        working-directory: app
+        run: |
+          set -euo pipefail
+          VERSION="${{ inputs.version || github.ref_name }}"
+          PLATFORM="${{ matrix.goos }}-${{ matrix.goarch }}"
+          if [ "${{ matrix.goos }}" = windows ]; then
+            CORE="$RUNNER_TEMP/EOS-protocol-check/core/${{ matrix.triple }}/eos-core.exe"
+            APP="$RUNNER_TEMP/EOS-protocol-check/eos-app.exe"
+          elif [ "${{ matrix.goos }}" = linux ]; then
+            CORE="$RUNNER_TEMP/eos-protocol-data/eos-app/core/${{ matrix.triple }}/eos-core"
+            APP="$RUNNER_TEMP/eos-protocol-data/eos-app/eos-app"
+          else
+            NAME=EOS
+            if [ "${{ inputs.channel }}" = beta ]; then NAME="EOS Beta"; fi
+            BUNDLE="dist/eos-app_${VERSION#v}_$PLATFORM/$NAME.app"
+            codesign --verify --deep --strict "$BUNDLE"
+            CORE="$BUNDLE/Contents/Resources/core/${{ matrix.triple }}/eos-core"
+            APP="$BUNDLE/Contents/MacOS/eos-app"
+          fi
+          go version -m "$APP" > "dist/build-identity-$PLATFORM.txt"
+          grep -F "BuildUpdateChannel=${{ inputs.channel || 'stable' }}" "dist/build-identity-$PLATFORM.txt"
+          python3 scripts/verify_legacy_upgrade.py --core "$CORE" --manifest "$(dirname "$CORE")/manifest.json" --out "dist/upgrade-$PLATFORM.json"
 
       # build_release.go 会留下同名 staging 目录（exe+core 展开态），归档与
       # 安装器都取完后清掉，防止污染 release 资产。
