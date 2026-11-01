@@ -51,6 +51,8 @@ permissions:
 env:
   CARGO_TERM_COLOR: always
   GOPRIVATE: github.com/eosaios/*
+  # Core JSON is UTF-8 on every platform; Windows Python otherwise uses cp1252.
+  PYTHONUTF8: "1"
 
 jobs:
   build:
