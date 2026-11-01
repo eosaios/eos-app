@@ -10,6 +10,11 @@ on:
         description: "版本号（如 v1.0.0-beta.2，留空则拒绝）"
         required: true
         default: ""
+      publish:
+        description: "验收通过后才公开发布；候选构建保持 false"
+        type: boolean
+        required: false
+        default: false
       src_ref:
         description: "App 源码 ref（默认 main）"
         required: false
@@ -35,6 +40,7 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
+  GOPRIVATE: github.com/eosaios/*
 
 jobs:
   build:
@@ -72,6 +78,12 @@ jobs:
           ref: ${{ inputs.core_ref || 'main' }}
           token: ${{ secrets.EOS_CORE_PAT }}
           path: eos-core-rs
+
+      - name: Authenticate private Go dependencies
+        shell: bash
+        env:
+          EOS_SOURCE_TOKEN: ${{ secrets.EOS_CORE_PAT }}
+        run: git config --global url."https://x-access-token:${EOS_SOURCE_TOKEN}@github.com/".insteadOf "https://github.com/"
 
       - uses: actions/setup-go@v6
         with:
@@ -205,6 +217,7 @@ jobs:
 
   release:
     name: Create GitHub Release
+    if: github.event_name == 'push' || inputs.publish
     runs-on: ubuntu-latest
     needs: build
     steps:
@@ -376,25 +389,8 @@ jobs:
             if [ "$code" = "200" ]; then
               echo "uploaded $platform <- $file (quality=$QUALITY)"
             elif [ "$code" = "409" ]; then
-              # 同版本覆盖发版：删旧行（连带存储对象）后重传，内容与 is_current 全量刷新
-              OLD_ID=$(curl -fsS "$API/api/v1/admin/version-management/versions?application_id=$app_id" -H "$AUTH" \
-                | jq -r --arg v "$VERNUM" '[.data[] | select(.product_version==$v) | .id][0] // empty')
-              if [ -z "$OLD_ID" ]; then
-                echo "::error::$platform 409 但找不到已有版本行，人工检查"
-                exit 1
-              fi
-              curl -fsS -X DELETE "$API/api/v1/admin/version-management/versions/$OLD_ID" -H "$AUTH" >/dev/null
-              code2=$(curl -s -o /tmp/upload-resp2.json -w '%{http_code}' -X POST \
-                "$API/api/v1/admin/version-management/versions/upload" -H "$AUTH" \
-                -F "application_id=$app_id" -F "product_version=$VERNUM" -F "commit=$COMMIT" \
-                -F "platform=$platform" -F "quality=$QUALITY" -F "release_notes=$NOTES" \
-                -F "is_current=true" -F "file=@assets/$file")
-              if [ "$code2" = "200" ]; then
-                echo "replaced $platform $VERNUM (was 409, deleted and re-uploaded)"
-              else
-                echo "::error::$platform 覆盖重传失败 HTTP $code2：$(cat /tmp/upload-resp2.json)"
-                exit 1
-              fi
+              echo "::error::$platform already exists; inspect existing row and checksum instead of replacing it"
+              exit 1
             else
               echo "::error::$platform 上传失败 HTTP $code：$(cat /tmp/upload-resp.json)"
               exit 1
