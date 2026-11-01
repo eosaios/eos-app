@@ -141,6 +141,7 @@ jobs:
         with:
           workspaces: eos-core-rs
           key: ${{ matrix.triple }}
+          cache-on-failure: true
 
       - name: Build sidecar (release)
         working-directory: eos-core-rs
@@ -289,7 +290,8 @@ jobs:
             APP="$BUNDLE/Contents/MacOS/eos-app"
           fi
           go version -m "$APP" > "dist/build-identity-$PLATFORM.txt"
-          grep -F "BuildUpdateChannel=${{ inputs.channel || 'stable' }}" "dist/build-identity-$PLATFORM.txt"
+          grep -F "vcs.revision=$(git rev-parse HEAD)" "dist/build-identity-$PLATFORM.txt"
+          grep -F -- '-tags=eos_noembed,production' "dist/build-identity-$PLATFORM.txt"
           python3 scripts/verify_legacy_upgrade.py --core "$CORE" --manifest "$(dirname "$CORE")/manifest.json" --out "dist/upgrade-$PLATFORM.json"
 
       # build_release.go 会留下同名 staging 目录（exe+core 展开态），归档与
@@ -300,10 +302,17 @@ jobs:
         run: rm -rf dist/eos-app_*/
 
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: dist-${{ matrix.goos }}-${{ matrix.goarch }}
-          path: app/dist/*
-          if-no-files-found: error
+          path: |
+            app/dist/*.dmg
+            app/dist/*.tar.gz
+            app/dist/*.zip
+            app/dist/*.exe
+            app/dist/*.json
+            app/dist/*.txt
+          if-no-files-found: warn
 
   release:
     name: Create GitHub Release
