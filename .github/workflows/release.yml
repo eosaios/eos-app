@@ -203,6 +203,7 @@ jobs:
           Get-ChildItem dist
 
       - name: Verify Windows login protocol registration
+        timeout-minutes: 5
         if: matrix.goos == 'windows'
         shell: pwsh
         working-directory: app
@@ -210,7 +211,14 @@ jobs:
           $version = "${{ inputs.version || github.ref_name }}"
           $install = Join-Path $env:RUNNER_TEMP "EOS-protocol-check"
           $installer = Resolve-Path "dist/eos-app-setup-$version.exe"
-          $process = Start-Process $installer -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CURRENTUSER", "/DIR=$install" -PassThru -Wait
+          # Start-Process -Wait also waits for the EOS client launched by Inno.
+          # Wait only for the installer, then inspect the persisted URL handler.
+          $process = Start-Process $installer -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CURRENTUSER", "/DIR=$install" -PassThru
+          if (-not $process.WaitForExit(120000)) {
+            $process.Kill($true)
+            throw "Windows installer did not exit within 120 seconds"
+          }
+          $process.Refresh()
           if ($process.ExitCode -ne 0) { throw "Installer failed: $($process.ExitCode)" }
           $command = (Get-Item 'HKCU:\Software\Classes\eosagent\shell\open\command').GetValue('')
           if ($command -ne "`"$install\eos-app.exe`" `"%1`"") { throw "Incorrect login protocol command: $command" }
