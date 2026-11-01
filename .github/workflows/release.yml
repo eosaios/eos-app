@@ -28,9 +28,9 @@ on:
         required: false
         default: "main"
       channel:
-        description: "候选包通道；Beta 当前仅发布 Mac Apple Silicon"
+        description: "候选包通道；Dev/Beta 当前仅发布 Mac Apple Silicon"
         type: choice
-        options: [stable, beta]
+        options: [stable, beta, dev]
         default: stable
       build_target:
         description: "构建目标；remaining-stable 保留已验收的 Mac ARM 包"
@@ -75,6 +75,8 @@ jobs:
           set -euo pipefail
           if [ "$CHANNEL" = beta ]; then
             [[ "$VERSION" == *-beta.* && "$BUILD_TARGET" = darwin-arm64 && "$PUBLISH" != true ]] || { echo "::error::Beta requires its Mac candidate target and publish=false"; exit 1; }
+          elif [ "$CHANNEL" = dev ]; then
+            [[ "$VERSION" == *-dev.* && "$BUILD_TARGET" = darwin-arm64 && "$PUBLISH" != true ]] || { echo "::error::Dev requires its sandbox Mac candidate target and publish=false"; exit 1; }
           else
             [[ "$VERSION" != *-* ]] || { echo "::error::Stable version cannot be a prerelease"; exit 1; }
           fi
@@ -103,6 +105,12 @@ jobs:
           ref: ${{ inputs.core_ref || 'main' }}
           token: ${{ secrets.EOS_CORE_PAT }}
           path: eos-core-rs
+
+      - name: Checkout release verification tools
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: release-tools
 
       - name: Authenticate private Go dependencies
         shell: bash
@@ -284,6 +292,7 @@ jobs:
           else
             NAME=EOS
             if [ "${{ inputs.channel }}" = beta ]; then NAME="EOS Beta"; fi
+            if [ "${{ inputs.channel }}" = dev ]; then NAME="EOS Dev"; fi
             BUNDLE="dist/eos-app_${VERSION#v}_$PLATFORM/$NAME.app"
             codesign --verify --deep --strict "$BUNDLE"
             CORE="$BUNDLE/Contents/Resources/core/${{ matrix.triple }}/eos-core"
@@ -293,6 +302,14 @@ jobs:
           grep -F "vcs.revision=$(git rev-parse HEAD)" "dist/build-identity-$PLATFORM.txt"
           grep -F -- '-tags=eos_noembed,production' "dist/build-identity-$PLATFORM.txt"
           python3 scripts/verify_legacy_upgrade.py --core "$CORE" --manifest "$(dirname "$CORE")/manifest.json" --out "dist/upgrade-$PLATFORM.json"
+
+      - name: Record packaged provenance
+        shell: bash
+        working-directory: app
+        env:
+          RELEASE_CHANNEL: ${{ inputs.channel || 'stable' }}
+          RELEASE_VERSION: ${{ inputs.version || github.ref_name }}
+        run: python3 ../release-tools/scripts/record-app-build.py --channel "$RELEASE_CHANNEL" --version "$RELEASE_VERSION" --platform "${{ matrix.goos }}-${{ matrix.goarch }}" --triple "${{ matrix.triple }}"
 
       # build_release.go 会留下同名 staging 目录（exe+core 展开态），归档与
       # 安装器都取完后清掉，防止污染 release 资产。
