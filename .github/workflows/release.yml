@@ -302,6 +302,8 @@ jobs:
           grep -F "vcs.revision=$(git rev-parse HEAD)" "dist/build-identity-$PLATFORM.txt"
           grep -F -- '-tags=eos_noembed,production' "dist/build-identity-$PLATFORM.txt"
           python3 scripts/verify_legacy_upgrade.py --core "$CORE" --manifest "$(dirname "$CORE")/manifest.json" --out "dist/upgrade-$PLATFORM.json"
+          python3 tools/probe-model-proxy.py --core "$CORE" --out "$RUNNER_TEMP/model-proxy-$PLATFORM"
+          cp "$RUNNER_TEMP/model-proxy-$PLATFORM/result.json" "dist/proxy-$PLATFORM.json"
 
       - name: Record packaged provenance
         shell: bash
