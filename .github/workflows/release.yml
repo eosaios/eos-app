@@ -105,7 +105,7 @@ jobs:
       # xcap 截图链（wayland-sys/drm-sys/pipewire-sys 的 pkg-config 探测）。
       - name: Install GTK/WebKit headers (linux)
         if: matrix.goos == 'linux'
-        run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev pkg-config libpipewire-0.3-dev libdrm-dev libgbm-dev libwayland-dev libxdo-dev
+        run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev pkg-config libpipewire-0.3-dev libdrm-dev libgbm-dev libwayland-dev libxdo-dev xdg-utils desktop-file-utils
 
       # build_release.go 的 Windows syso 生成（图标/版本资源）依赖 wails3 CLI。
       - name: Install wails3 CLI (windows)
@@ -201,6 +201,37 @@ jobs:
           & iscc "/DMyAppVersion=$version" installer.iss
           if ($LASTEXITCODE -ne 0) { throw "iscc failed (exit $LASTEXITCODE)" }
           Get-ChildItem dist
+
+      - name: Verify Windows login protocol registration
+        if: matrix.goos == 'windows'
+        shell: pwsh
+        working-directory: app
+        run: |
+          $version = "${{ inputs.version || github.ref_name }}"
+          $install = Join-Path $env:RUNNER_TEMP "EOS-protocol-check"
+          $installer = Resolve-Path "dist/eos-app-setup-$version.exe"
+          $process = Start-Process $installer -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CURRENTUSER", "/DIR=$install" -PassThru -Wait
+          if ($process.ExitCode -ne 0) { throw "Installer failed: $($process.ExitCode)" }
+          $command = (Get-Item 'HKCU:\Software\Classes\eosagent\shell\open\command').GetValue('')
+          if ($command -ne "`"$install\eos-app.exe`" `"%1`"") { throw "Incorrect login protocol command: $command" }
+          if (-not (Get-ItemProperty 'HKCU:\Software\Classes\eosagent').PSObject.Properties['URL Protocol']) { throw "Missing URL Protocol marker" }
+          Get-Process eos-app,eos-core -ErrorAction SilentlyContinue | Stop-Process -Force
+          Write-Output "Windows installer registered eosagent for the installed executable."
+
+      - name: Verify Linux login protocol registration
+        if: matrix.goos == 'linux'
+        shell: bash
+        working-directory: app
+        run: |
+          set -euo pipefail
+          export XDG_DATA_HOME="$RUNNER_TEMP/eos-protocol-data"
+          export XDG_CONFIG_HOME="$RUNNER_TEMP/eos-protocol-config"
+          mkdir -p "$XDG_CONFIG_HOME"
+          VERSION="${{ inputs.version || github.ref_name }}"
+          bash "dist/eos-app_${VERSION#v}_${{ matrix.goos }}-${{ matrix.goarch }}/install.sh"
+          test -x "$XDG_DATA_HOME/eos-app/eos-app"
+          test "$(xdg-mime query default x-scheme-handler/eosagent)" = eos-app.desktop
+          grep -F 'MimeType=x-scheme-handler/eosagent;' "$XDG_DATA_HOME/applications/eos-app.desktop"
 
       # build_release.go 会留下同名 staging 目录（exe+core 展开态），归档与
       # 安装器都取完后清掉，防止污染 release 资产。
