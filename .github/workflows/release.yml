@@ -27,6 +27,11 @@ on:
         description: "Core 构建 ref（默认 main）"
         required: false
         default: "main"
+      build_target:
+        description: "构建目标；事故修复可先验收 Mac Apple Silicon"
+        type: choice
+        options: [all, darwin-arm64]
+        default: all
       reuse_run_id:
         description: "Windows 构建恢复：复用此已完成运行的 macOS/Linux 产物，仅重建 Windows（正常发版留空）"
         required: false
@@ -51,7 +56,7 @@ jobs:
       matrix:
         # 正常发版构建五目标；Windows 打包恢复只构建 Windows，复用其余四目标。
         # macOS Intel 在 ARM runner 上交叉编译；Linux 使用 glibc 以支持截图系统库。
-        include: ${{ fromJSON(inputs.reuse_run_id != '' && '[{"goos":"windows","goarch":"amd64","runner":"windows-latest","triple":"x86_64-pc-windows-gnu"}]' || '[{"goos":"windows","goarch":"amd64","runner":"windows-latest","triple":"x86_64-pc-windows-gnu"},{"goos":"darwin","goarch":"amd64","runner":"macos-latest","triple":"x86_64-apple-darwin"},{"goos":"darwin","goarch":"arm64","runner":"macos-latest","triple":"aarch64-apple-darwin"},{"goos":"linux","goarch":"amd64","runner":"ubuntu-latest","triple":"x86_64-unknown-linux-gnu"},{"goos":"linux","goarch":"arm64","runner":"ubuntu-24.04-arm","triple":"aarch64-unknown-linux-gnu"}]') }}
+        include: ${{ fromJSON(inputs.build_target == 'darwin-arm64' && '[{"goos":"darwin","goarch":"arm64","runner":"macos-latest","triple":"aarch64-apple-darwin"}]' || inputs.reuse_run_id != '' && '[{"goos":"windows","goarch":"amd64","runner":"windows-latest","triple":"x86_64-pc-windows-gnu"}]' || '[{"goos":"windows","goarch":"amd64","runner":"windows-latest","triple":"x86_64-pc-windows-gnu"},{"goos":"darwin","goarch":"amd64","runner":"macos-latest","triple":"x86_64-apple-darwin"},{"goos":"darwin","goarch":"arm64","runner":"macos-latest","triple":"aarch64-apple-darwin"},{"goos":"linux","goarch":"amd64","runner":"ubuntu-latest","triple":"x86_64-unknown-linux-gnu"},{"goos":"linux","goarch":"arm64","runner":"ubuntu-24.04-arm","triple":"aarch64-unknown-linux-gnu"}]') }}
 
     steps:
       # eos-app 的 go.mod replace github.com/eosaios/eos => ../eos-cli，
