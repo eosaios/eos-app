@@ -1,0 +1,86 @@
+name: Finalize checked candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Completed build whose only failure was provenance recording
+        required: true
+      version:
+        description: Existing immutable candidate version
+        required: true
+      src_ref:
+        description: Frozen application commit
+        required: true
+      cli_ref:
+        description: Frozen CLI commit
+        required: true
+      core_ref:
+        description: Frozen Core commit
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  finalize:
+    name: finalize (${{ matrix.goos }}/${{ matrix.goarch }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {goos: darwin, goarch: arm64, triple: aarch64-apple-darwin}
+          - {goos: darwin, goarch: amd64, triple: x86_64-apple-darwin}
+          - {goos: windows, goarch: amd64, triple: x86_64-pc-windows-gnu}
+          - {goos: linux, goarch: amd64, triple: x86_64-unknown-linux-gnu}
+          - {goos: linux, goarch: arm64, triple: aarch64-unknown-linux-gnu}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: eosaios/eos-app-src
+          ref: ${{ inputs.src_ref }}
+          token: ${{ secrets.EOS_CORE_PAT }}
+          path: app
+      - uses: actions/checkout@v4
+        with:
+          repository: eosaios/eos
+          ref: ${{ inputs.cli_ref }}
+          path: eos-cli
+      - uses: actions/checkout@v4
+        with:
+          repository: eosaios/eos-core-rs
+          ref: ${{ inputs.core_ref }}
+          token: ${{ secrets.EOS_CORE_PAT }}
+          path: eos-core-rs
+      - uses: actions/checkout@v4
+        with:
+          path: release-tools
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: app/dist
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ github.token }}
+      - name: Verify original native checks and record unchanged archives
+        working-directory: app
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_RUN: ${{ inputs.run_id }}
+          VERSION: ${{ inputs.version }}
+        run: >-
+          python3 ../release-tools/scripts/finalize-app-candidate.py
+          --run-id "$BUILD_RUN" --version "$VERSION"
+          --platform "${{ matrix.goos }}-${{ matrix.goarch }}" --triple "${{ matrix.triple }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: |
+            app/dist/*.dmg
+            app/dist/*.tar.gz
+            app/dist/*.zip
+            app/dist/*.exe
+            app/dist/*.json
+            app/dist/*.txt
+          if-no-files-found: error
