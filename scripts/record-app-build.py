@@ -49,6 +49,11 @@ def record(args):
                 for route in ('proxy-one', 'proxy-two', 'direct')}
     assert {(check['protocol'], check['route']) for check in proxy_gate['checks']} == expected
     assert all(check['list'] and check['verify'] and check['turn_stream'] for check in proxy_gate['checks'])
+    capability_gate = json.loads((root / 'dist' / f'capabilities-{args.platform}.json').read_text())
+    assert capability_gate['no_cloud_requests'] and capability_gate['restart_preserved_upstream_limits']
+    assert [(turn['request_effort'], turn['actual_context_window']) for turn in capability_gate['turns']] == [
+        (level, 1_050_000) for level in ('low', 'medium', 'high', 'xhigh', 'max', 'none')
+    ] + [('max', 64_000)]
     app_source = revision(root)
     identity = (root / 'dist' / f'build-identity-{args.platform}.txt').read_text()
     assert 'vcs.revision=' + app_source['commit'] in identity
@@ -68,7 +73,8 @@ def record(args):
         'core_sha256': core_sha, 'core_manifest_sha256': sha(core_dir / 'manifest.json'),
         'environment': 'sandbox' if channel == 'dev' else 'production',
         'api_origin': 'https://api-test.eosaios.com' if channel == 'dev' else 'https://api.eosaios.com',
-        'native_upgrade_gate': gate, 'native_proxy_gate': proxy_gate, 'files': files,
+        'native_upgrade_gate': gate, 'native_proxy_gate': proxy_gate,
+        'native_capability_gate': capability_gate, 'files': files,
     }
     (root / 'dist' / f'provenance-{args.platform}.json').write_text(json.dumps(result, indent=2) + '\n')
     print(json.dumps(result))
