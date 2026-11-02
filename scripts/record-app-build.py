@@ -54,6 +54,30 @@ def record(args):
     assert [(turn['request_effort'], turn['actual_context_window']) for turn in capability_gate['turns']] == [
         (level, 1_050_000) for level in ('low', 'medium', 'high', 'xhigh', 'max', 'none')
     ] + [('max', 64_000)]
+    dynamic_gate = json.loads((root / 'dist' / f'dynamic-capabilities-{args.platform}.json').read_text())
+    assert len(dynamic_gate['actual_turns']) == len(dynamic_gate['requests']) == 15
+    assert sum(turn['image_input'] for turn in dynamic_gate['actual_turns']) == 14
+    for check in ('provider_priority_per_field', 'online_catalog_update_without_rebuild',
+                  'removed_provider_claims_use_catalog', 'vision_denied_before_inference',
+                  'invalid_catalog_keeps_valid_cache', 'offline_restart_uses_cached_capabilities',
+                  'catalog_requests_have_no_credentials', 'no_cloud_inference'):
+        assert dynamic_gate[check], check
+    def image_blocks(value):
+        if isinstance(value, dict):
+            if value.get('type') in ('image', 'image_url', 'input_image'):
+                yield value
+            for child in value.values():
+                yield from image_blocks(child)
+        elif isinstance(value, list):
+            for child in value:
+                yield from image_blocks(child)
+    for request in dynamic_gate['requests']:
+        assert len(list(image_blocks(request['body']))) == int(request['actual_image_bytes_sent'])
+    live_gate = json.loads((root / 'dist' / f'live-capability-catalog-{args.platform}.json').read_text())
+    expected_catalog = json.loads((root.parent / 'eos-core-rs/catalogs/model-capabilities-v1.json').read_text())
+    assert live_gate['url'] == 'https://api.eosaios.com/api/v1/model-capabilities/v1.json'
+    assert live_gate['actual_core_https_fetch_verified'] and live_gate['persisted_cache_verified']
+    assert (live_gate['revision'], live_gate['models']) == (expected_catalog['revision'], len(expected_catalog['models']))
     app_source = revision(root)
     identity = (root / 'dist' / f'build-identity-{args.platform}.txt').read_text()
     assert 'vcs.revision=' + app_source['commit'] in identity
@@ -74,7 +98,8 @@ def record(args):
         'environment': 'sandbox' if channel == 'dev' else 'production',
         'api_origin': 'https://api-test.eosaios.com' if channel == 'dev' else 'https://api.eosaios.com',
         'native_upgrade_gate': gate, 'native_proxy_gate': proxy_gate,
-        'native_capability_gate': capability_gate, 'files': files,
+        'native_capability_gate': capability_gate, 'native_dynamic_capability_gate': dynamic_gate,
+        'native_live_catalog_gate': live_gate, 'files': files,
     }
     (root / 'dist' / f'provenance-{args.platform}.json').write_text(json.dumps(result, indent=2) + '\n')
     print(json.dumps(result))
