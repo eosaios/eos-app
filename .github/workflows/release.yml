@@ -311,7 +311,14 @@ jobs:
           cp "$RUNNER_TEMP/model-capabilities-$PLATFORM/result.json" "dist/capabilities-$PLATFORM.json"
           python3 tools/probe-dynamic-model-capabilities.py --core "$CORE" --out "$RUNNER_TEMP/dynamic-capabilities-$PLATFORM"
           cp "$RUNNER_TEMP/dynamic-capabilities-$PLATFORM/result.json" "dist/dynamic-capabilities-$PLATFORM.json"
-          python3 tools/probe-live-capability-catalog.py --core "$CORE" --expected ../eos-core-rs/catalogs/model-capabilities-v1.json --url default --out "$RUNNER_TEMP/live-capability-catalog-$PLATFORM"
+          # The online catalog updates independently of the frozen Core source.
+          # Compare the actual Core fetch with a fresh production snapshot.
+          EXPECTED="$RUNNER_TEMP/expected-capability-catalog-$PLATFORM.json"
+          curl --fail --silent --show-error --connect-timeout 15 --max-time 30 \
+            --user-agent EOS-Release-Verification \
+            https://api.eosaios.com/api/v1/model-capabilities/v1.json --output "$EXPECTED"
+          python3 tools/probe-live-capability-catalog.py --core "$CORE" --expected "$EXPECTED" --url default --out "$RUNNER_TEMP/live-capability-catalog-$PLATFORM"
+          cp "$EXPECTED" "dist/expected-capability-catalog-$PLATFORM.json"
           cp "$RUNNER_TEMP/live-capability-catalog-$PLATFORM/result.json" "dist/live-capability-catalog-$PLATFORM.json"
 
       - name: Record packaged provenance
