@@ -41,8 +41,8 @@ on:
         description: "Windows 构建恢复：复用此已完成运行的 macOS/Linux 产物，仅重建 Windows（正常发版留空）"
         required: false
         default: ""
-  push:
-    tags: ["v*"]
+  # Frozen candidates are published after verification; publishing a tag must
+  # not rebuild moving branch refs or overwrite the checked assets.
 
 permissions:
   contents: write
@@ -303,11 +303,16 @@ jobs:
           go version -m "$APP" > "dist/build-identity-$PLATFORM.txt"
           grep -F "vcs.revision=$(git rev-parse HEAD)" "dist/build-identity-$PLATFORM.txt"
           grep -F -- '-tags=eos_noembed,production' "dist/build-identity-$PLATFORM.txt"
+          export EOS_MODEL_CAPABILITY_CATALOG_URL=fixture://isolated/no-external-catalog
           python3 scripts/verify_legacy_upgrade.py --core "$CORE" --manifest "$(dirname "$CORE")/manifest.json" --out "dist/upgrade-$PLATFORM.json"
           python3 tools/probe-model-proxy.py --core "$CORE" --out "$RUNNER_TEMP/model-proxy-$PLATFORM"
           cp "$RUNNER_TEMP/model-proxy-$PLATFORM/result.json" "dist/proxy-$PLATFORM.json"
           python3 tools/probe-model-capabilities.py --core "$CORE" --out "$RUNNER_TEMP/model-capabilities-$PLATFORM"
           cp "$RUNNER_TEMP/model-capabilities-$PLATFORM/result.json" "dist/capabilities-$PLATFORM.json"
+          python3 tools/probe-dynamic-model-capabilities.py --core "$CORE" --out "$RUNNER_TEMP/dynamic-capabilities-$PLATFORM"
+          cp "$RUNNER_TEMP/dynamic-capabilities-$PLATFORM/result.json" "dist/dynamic-capabilities-$PLATFORM.json"
+          python3 tools/probe-live-capability-catalog.py --core "$CORE" --expected ../eos-core-rs/catalogs/model-capabilities-v1.json --url default --out "$RUNNER_TEMP/live-capability-catalog-$PLATFORM"
+          cp "$RUNNER_TEMP/live-capability-catalog-$PLATFORM/result.json" "dist/live-capability-catalog-$PLATFORM.json"
 
       - name: Record packaged provenance
         shell: bash
@@ -339,7 +344,7 @@ jobs:
 
   release:
     name: Create GitHub Release
-    if: github.event_name == 'push' || inputs.publish
+    if: inputs.publish
     runs-on: ubuntu-latest
     needs: build
     steps:
