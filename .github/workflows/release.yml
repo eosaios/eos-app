@@ -306,6 +306,8 @@ jobs:
           python3 scripts/verify_legacy_upgrade.py --core "$CORE" --manifest "$(dirname "$CORE")/manifest.json" --out "dist/upgrade-$PLATFORM.json"
           python3 tools/probe-model-proxy.py --core "$CORE" --out "$RUNNER_TEMP/model-proxy-$PLATFORM"
           cp "$RUNNER_TEMP/model-proxy-$PLATFORM/result.json" "dist/proxy-$PLATFORM.json"
+          python3 tools/probe-model-capabilities.py --core "$CORE" --out "$RUNNER_TEMP/model-capabilities-$PLATFORM"
+          cp "$RUNNER_TEMP/model-capabilities-$PLATFORM/result.json" "dist/capabilities-$PLATFORM.json"
 
       - name: Record packaged provenance
         shell: bash
