@@ -19,6 +19,16 @@ def revision(repo):
     return {'commit': git('HEAD'), 'tree': git('HEAD^{tree}')}
 
 
+def verified_live_catalog(root, platform):
+    live_gate = json.loads((root / 'dist' / f'live-capability-catalog-{platform}.json').read_text())
+    expected_snapshot = root / 'dist' / f'expected-capability-catalog-{platform}.json'
+    expected_catalog = json.loads(expected_snapshot.read_text())
+    assert live_gate['url'] == 'https://api.eosaios.com/api/v1/model-capabilities/v1.json'
+    assert live_gate['actual_core_https_fetch_verified'] and live_gate['persisted_cache_verified']
+    assert (live_gate['revision'], live_gate['models']) == (expected_catalog['revision'], len(expected_catalog['models']))
+    return live_gate, sha(expected_snapshot)
+
+
 def record(args):
     root = Path.cwd()
     version = args.version.removeprefix('v')
@@ -73,11 +83,7 @@ def record(args):
                 yield from image_blocks(child)
     for request in dynamic_gate['requests']:
         assert len(list(image_blocks(request['body']))) == int(request['actual_image_bytes_sent'])
-    live_gate = json.loads((root / 'dist' / f'live-capability-catalog-{args.platform}.json').read_text())
-    expected_catalog = json.loads((root.parent / 'eos-core-rs/catalogs/model-capabilities-v1.json').read_text())
-    assert live_gate['url'] == 'https://api.eosaios.com/api/v1/model-capabilities/v1.json'
-    assert live_gate['actual_core_https_fetch_verified'] and live_gate['persisted_cache_verified']
-    assert (live_gate['revision'], live_gate['models']) == (expected_catalog['revision'], len(expected_catalog['models']))
+    live_gate, expected_catalog_sha = verified_live_catalog(root, args.platform)
     app_source = revision(root)
     identity = (root / 'dist' / f'build-identity-{args.platform}.txt').read_text()
     assert 'vcs.revision=' + app_source['commit'] in identity
@@ -93,6 +99,8 @@ def record(args):
         'core_source': revision(root.parent / 'eos-core-rs'),
         'distribution_source': revision(root.parent / 'release-tools'),
         'workflow_run_id': os.environ['GITHUB_RUN_ID'],
+        'build_workflow_run_id': os.environ.get('EOS_REUSED_BUILD_RUN_ID', os.environ['GITHUB_RUN_ID']),
+        'expected_catalog_sha256': expected_catalog_sha,
         'bundle_id': bundle_id, 'app_binary_sha256': sha(binary),
         'core_sha256': core_sha, 'core_manifest_sha256': sha(core_dir / 'manifest.json'),
         'environment': 'sandbox' if channel == 'dev' else 'production',
