@@ -75,6 +75,8 @@ Main workspace (macOS uses native traffic-light window controls; Windows / Linux
 
 **Desktop source code is not public. Official binaries are free for personal and commercial work.** See [LICENSE](./LICENSE) for the full terms.
 
+This free-use grant also covers official, unmodified EOSAIOS binaries released previously. Older packages or historical snapshots may still contain earlier wording; see section 6.2 of the [current main-branch license](https://github.com/eosaios/eos-app/blob/main/LICENSE) for the current grant.
+
 - Individuals and organizations may use official, unmodified binaries for internal work, commercial software development and paid client projects without a separate commercial-use license
 - Unmodified sharing of official packages and public docs is allowed with the license, copyright notices and official source retained
 - Free use does not grant desktop source rights or permission to repackage or sell EOS App itself
