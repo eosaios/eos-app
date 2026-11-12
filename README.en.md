@@ -71,16 +71,27 @@ Main workspace (macOS uses native traffic-light window controls; Windows / Linux
 - Center: conversation and the main workflow
 - Bottom: input for new tasks (switch model and reasoning level); Bash terminal docked below
 
-## License
+## License and costs
 
-Installers and documentation are released under the EOS App Non-Commercial License (see [LICENSE](./LICENSE)):
+**Desktop source code is not public. Official binaries are free for personal and commercial work.** See [LICENSE](./LICENSE) for the full terms.
 
-- Free to download, install, and use for personal / non-commercial purposes; unmodified redistribution of official packages and docs is allowed
-- Commercial use is prohibited (including internal production use, paid services, SaaS, and commercial redistribution)
-- Commercial use requires separate written authorization from the copyright holder
-- This repository does not include the desktop source code
+This free-use grant also covers official, unmodified EOSAIOS binaries released previously. Older packages or historical snapshots may still contain earlier wording; see section 6.2 of the [current main-branch license](https://github.com/eosaios/eos-app/blob/main/LICENSE) for the current grant.
+
+- Individuals and organizations may use official, unmodified binaries for internal work, commercial software development and paid client projects without a separate commercial-use license
+- Unmodified sharing of official packages and public docs is allowed with the license, copyright notices and official source retained
+- Free use does not grant desktop source rights or permission to repackage or sell EOS App itself
+- Model API credits are not included; your provider determines API charges and data policies
+- The standalone EOS CLI distribution and third-party components retain their own licenses
+
+## First use and limitations
+
+1. Download the official package for your system and check its release notes and SHA-256 checksums.
+2. Add your provider endpoint, API key and model in model settings, then test the connection. BYOK coding does not require an EOS account; account services have their own sign-in requirements.
+3. Open a test project, choose execution permissions and request a small change. Review the diff and command output, then run the project tests before adopting the result.
+
+Model requests go to your configured endpoint and can include messages, file contents, project context, command output and screenshots. Websites, plugins, MCP, updates and account features can also use the network; check the enabled services' data policies. Tool calling, vision, context limits and reasoning support vary by model and endpoint. Costs are estimates; your provider's bill is authoritative. Approvals and sandbox policies do not replace review or guarantee correct results.
 
 ## Contact
 
 - Issues: https://github.com/eosaios/eos-app/issues
-- Commercial licensing: legal@eosaios.com
+- Partnerships / redistribution licensing: legal@eosaios.com
