@@ -2,44 +2,48 @@
 
 [中文](./README.md) | [English](./README.en.md)
 
-**A desktop AI coding workspace.** Conversations, task execution, command verification, and project management in one window—built for real projects, not just code chat.
+**A desktop AI coding workspace.** Work with AI on local projects and inspect file changes, command output and task progress in one window.
 
 - Download: [Releases](https://github.com/eosaios/eos-app/releases) (always use the latest release)
 - Issues: [Issues](https://github.com/eosaios/eos-app/issues)
 - Terminal edition: [EOS CLI](https://github.com/eosaios/eos)
 
-This repository is the **official distribution repo** for EOS App: installers, release notes, and product information — **not** the desktop source code. Core capabilities are built on the Rust core of [EOS CLI](https://github.com/eosaios/eos). Each package ships a signed Core (SHA-256 checksum + Ed25519 signature).
+This repository is the **official distribution repo** for EOS App: installers, release notes, and product information — **not** the desktop source code. Core capabilities are built on the Rust core of [EOS CLI](https://github.com/eosaios/eos). Official packages include Core integrity checks (SHA-256 and Ed25519 verification). Core verification is separate from operating-system signing of the application package, which depends on the particular release.
 
 ## Why EOS App
 
-Coding work often stalls on tool switching: chat in one window, terminal in another, a third for the browser, and you still watch Git status yourself.
+Work on project conversations, inspect changes, run terminal commands and check pages through the available browser backend in one workspace.
 
-EOS App pulls that into one workspace:
+- **Coordinate tasks** — conversations, plans, tasks and approvals in one place
+- **Use the browser** — navigation, clicks, forms and human takeover, with platform-dependent backends
+- **Inspect the work** — Git status, diffs, command output and previews of supported artifact formats
+- **Configure and maintain** — themes, reply preferences, in-app update checks and system tray
 
-- **State the goal, keep moving** — chat, planning, tasks, and approvals on one thread
-- **AI can drive the web** — embedded live browser; hand control back to you for sign-in / verification
-- **See the changes** — Git status, command output, and artifact previews side by side
-- **Built for the long run** — theme skins, personalized replies, in-app updates, system tray
+## Capabilities and requirements
 
-## Capabilities
+**Conversations and projects**
 
-**Conversation & collaboration**  
-Conversation workspace · Plan / auto modes · Approvals & sandbox levels · AI refine input · Capture board (save great replies as knowledge cards)
+Project chats, attachments, plan / auto modes, input refinement and saved reply snippets; tasks and plan todos, Git status and diffs, commits / pushes, worktrees and remote-repository operations. Prepare Git, project toolchains and repository credentials as needed.
 
-**Tasks & engineering**  
-Task center with plan todos · Bash workspace · Git commit/push with reminders · Worktree / remote repos · Change summary & artifact previews
+**Browser**
 
-**Browser collaboration**  
-Embedded live browser (tabs, shared viewport) · AI navigate / pick / fill · Human takeover · Pick page elements into the chat
+macOS / Windows have native embedded browser hosts; Linux defaults to a separate browser engine. Supported backends provide navigation, clicks, forms and human takeover. Available actions depend on the backend, browser runtime and site restrictions; for example the embedded macOS backend does not support browser-tool PDF export. Feature parity across platforms is not implied.
 
-**Models & context**  
-Multi-provider model access · Model wizard with connectivity test · Linked reasoning levels · Live context usage · Rules / memory · Usage & cost
+**Permissions and execution policies**
 
-**Extensions & appearance**  
-Skills and apps · Plugin marketplace · Automation · Built-in theme skins + local / GitHub import · MCP / LSP / network / notifications
+Configure approvals, tool policies and sandbox levels. Current policy checks are not complete operating-system isolation; consult the backend status shown in the app. Review commands and changes before adopting them.
 
-**Desktop experience**  
-In-app updates · System tray & single instance · Desktop notifications · Native windows on Windows / macOS / Linux
+**Models, context and usage**
+
+Configure model connections and check connectivity; manage rules, memory and context. Tools, vision, reasoning controls and context limits depend on the model and endpoint. Usage depends on provider-reported data; cost estimates may be unavailable without usage or pricing information. The provider invoice is authoritative.
+
+**Extensions and automation**
+
+Skills, MCP connections, plugin marketplace, themes and compatible local / GitHub theme imports. Marketplace installation and online services may require sign-in and entitlement; LSP requires its language server. Scheduled automations run only while EOS App is running and stop when the app exits.
+
+**Terminal and desktop**
+
+Integrated terminal, system tray, single instance and desktop notifications. The Windows terminal needs Bash, for example Git for Windows; Windows may need WebView2. Linux needs compatible WebKit / GTK desktop libraries. Check the corresponding release notes for platform and version availability.
 
 ## Platforms & install
 
@@ -51,19 +55,19 @@ In-app updates · System tray & single instance · Desktop notifications · Nati
 
 1. Open [Releases](https://github.com/eosaios/eos-app/releases) and download the latest package for your platform
 2. Verify with `SHA256SUMS.txt` on the same page if needed
-3. After install, check for updates in-app — download and install are automatic
+3. Check and download updates in-app, then initiate installation. Windows / macOS use their platform installer flows; Linux opens the download folder for manual extraction and replacement.
 
 > Asset names follow each Release page. Version numbers move with releases and are not repeated in this document.
 
 ## Screenshots
 
-### Demo video (90 seconds)
+### Demo video (about 80 seconds)
 
 [![EOS App demo: from one request to a working file](https://eosaios.com/assets/eos-promo-preview.gif)](https://eosaios.com/assets/eos-promo.mp4)
 
 Click the preview for the full walkthrough — conversation, task execution, and file generation.
 
-Main workspace (macOS uses native traffic-light window controls; Windows / Linux use matching platform-style buttons):
+Example workspace on macOS; layout can differ by system and release:
 
 ![EOS App main workspace](docs/images/workspace-overview.png)
 
