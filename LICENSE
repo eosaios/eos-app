@@ -1,28 +1,30 @@
-EOS App 官方二进制包与文档免费使用许可证 v2.0
+EOS Agent 官方二进制包与文档免费使用许可证 v2.0
+
+产品名称说明：EOS Agent 原名 EOS App，本次更名不改变本许可证条款及其对历史官方发行物的适用范围。
 
 版权所有 (c) 2026 EOSAIOS (legal@eosaios.com)
 保留所有权利。
 
 一、适用范围
-1. 本许可证适用于由 EOSAIOS 官方发布的 EOS App 未修改二进制安装包、便携包、随附校验文件，以及公开发布的版本说明、截图和产品文档。
-2. EOS App 桌面端源码不公开。本许可证不授予未公开源码、构建脚本或内部实现的获取、修改、编译或分发权利。源码即使存在于私有开发仓库，也不在本许可证的授权范围内。
+1. 本许可证适用于由 EOSAIOS 官方发布的 EOS Agent 未修改二进制安装包、便携包、随附校验文件，以及公开发布的版本说明、截图和产品文档。
+2. EOS Agent 桌面端源码不公开。本许可证不授予未公开源码、构建脚本或内部实现的获取、修改、编译或分发权利。源码即使存在于私有开发仓库，也不在本许可证的授权范围内。
 3. 随附第三方组件依其各自许可证授权；本许可证不改变第三方的权利与义务。EOS CLI 独立发行版本的使用和源码授权以其独立仓库 LICENSE 为准。
 
 二、免费使用授权
 在遵守本许可证的前提下，任何个人或组织均可免费：
 1. 下载、安装、复制和运行官方二进制包，不限制个人、学习、企业内部工作或商业用途；
-2. 使用软件开发商业软件、运营自身业务、完成收费客户项目或提供咨询等工作，无需另行购买 EOS App 商业使用授权；
+2. 使用软件开发商业软件、运营自身业务、完成收费客户项目或提供咨询等工作，无需另行购买 EOS Agent 商业使用授权；
 3. 原样分享和再分发官方二进制包、校验文件及公开文档，但须保持完整，保留本许可证、版权与商标声明，并明确官方来源。
-上述工作本身收费或用于生产环境，不构成对本许可的违反。使用 EOS App 不会仅因本许可证而要求你公开自己的项目源码或将项目权利授予 EOSAIOS。
+上述工作本身收费或用于生产环境，不构成对本许可的违反。使用 EOS Agent 不会仅因本许可证而要求你公开自己的项目源码或将项目权利授予 EOSAIOS。
 
 三、软件免费与服务费用
 1. 官方二进制包的免费使用授权不包含模型 API、第三方服务或另行标价的 EOS 服务的免费额度。
 2. 使用自带 API Key 时，服务商的费用、配额、使用条件和数据政策仍然适用。
 
 四、保留的权利
-1. 本许可证不授予 EOS App 桌面端源码相关权利，也不授予 EOS 商标的独立使用权。
-2. 未经 EOSAIOS 书面授权，不得修改、拆包、重新打包或销售 EOS App 软件本身，也不得将其作为自己的软件产品进行再发布或集成分发。此限制不禁止第二条所允许的商业工作和商业项目开发。
-3. 不得删除或篡改权属信息，不得将发行仓虚称为桌面端源码仓库或将 EOS App 虚称为开源软件。
+1. 本许可证不授予 EOS Agent 桌面端源码相关权利，也不授予 EOS 商标的独立使用权。
+2. 未经 EOSAIOS 书面授权，不得修改、拆包、重新打包或销售 EOS Agent 软件本身，也不得将其作为自己的软件产品进行再发布或集成分发。此限制不禁止第二条所允许的商业工作和商业项目开发。
+3. 不得删除或篡改权属信息，不得将发行仓虚称为桌面端源码仓库或将 EOS Agent 虚称为开源软件。
 4. 第三方再分发不得暗示获得 EOSAIOS 的认证、担保或背书。
 5. 超出本许可证范围的再打包、软件销售或集成分发，可联系 legal@eosaios.com 另行约定；正常商业使用无需申请。
 
@@ -31,16 +33,16 @@ EOS App 官方二进制包与文档免费使用许可证 v2.0
 
 六、终止及其他
 1. 违反本许可证时，相关许可终止；法律另有规定的除外。
-2. 本许可证适用于其随附的官方发行物；官方发行仓公布本许可证后，也授予此前由 EOSAIOS 发布的未修改 EOS App 二进制包本许可证第二条所述免费使用权。
+2. 本许可证适用于其随附的官方发行物；官方发行仓公布本许可证后，也授予此前由 EOSAIOS 发布的未修改 EOS Agent 二进制包本许可证第二条所述免费使用权。
 3. 本许可证不承诺未来版本、单独服务的定价或维护期限；单独标价的服务按其自身条款提供。
 4. 如部分条款无效，其余条款继续有效。本许可证以中文文本为准。
 
 English summary (the Chinese text above governs):
-Official, unmodified EOS App binaries are free for individuals and organizations,
+Official, unmodified EOS Agent binaries are free for individuals and organizations,
 including internal business work, commercial software development and paid client
 projects. No separate commercial-use license is required for that work. Using EOS
 App does not require publishing your project source code. Model APIs and separately
 priced services are not included. Unmodified sharing is allowed with notices and
 this license retained. Desktop source code is not public and no source rights are
-granted. Repackaging, selling EOS App itself or integrating and redistributing it
+granted. Repackaging, selling EOS Agent itself or integrating and redistributing it
 requires separate permission. Third-party components retain their own licenses.
