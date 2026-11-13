@@ -1,6 +1,6 @@
 name: Release
 
-# EOS App 三端 Release 构建（Windows / macOS / Linux，五目标矩阵），
+# EOS Agent 三端 Release 构建（Windows / macOS / Linux，五目标矩阵），
 # 产物与校验文件发布到本仓库 Release。
 
 on:
@@ -292,9 +292,9 @@ jobs:
             CORE="$RUNNER_TEMP/eos-protocol-data/eos-app/core/${{ matrix.triple }}/eos-core"
             APP="$RUNNER_TEMP/eos-protocol-data/eos-app/eos-app"
           else
-            NAME=EOS
-            if [ "${{ inputs.channel }}" = beta ]; then NAME="EOS Beta"; fi
-            if [ "${{ inputs.channel }}" = dev ]; then NAME="EOS Dev"; fi
+            NAME="EOS Agent"
+            if [ "${{ inputs.channel }}" = beta ]; then NAME="EOS Agent Beta"; fi
+            if [ "${{ inputs.channel }}" = dev ]; then NAME="EOS Agent Dev"; fi
             BUNDLE="dist/eos-app_${VERSION#v}_$PLATFORM/$NAME.app"
             codesign --verify --deep --strict "$BUNDLE"
             CORE="$BUNDLE/Contents/Resources/core/${{ matrix.triple }}/eos-core"
@@ -401,7 +401,7 @@ jobs:
           NOTES_FILE="docs/releases/$VERSION.md"
           [ -s "$NOTES_FILE" ] || { echo "::error::缺少发布说明 $NOTES_FILE"; exit 1; }
           gh release create "$VERSION" dist/* \
-            --title "EOS App $VERSION" \
+            --title "EOS Agent $VERSION" \
             --notes-file "$NOTES_FILE" \
             --repo "$GITHUB_REPOSITORY"
 
@@ -531,10 +531,10 @@ jobs:
             fi
           }
 
-          upload_asset windows-amd64 "EOS App (Windows x64)" "eos-app-setup-$VERSION.exe"
-          upload_asset darwin-amd64 "EOS App (macOS Intel)" "eos-app_${VERNUM}_darwin-amd64.dmg"
-          upload_asset darwin-arm64 "EOS App (macOS Apple Silicon)" "eos-app_${VERNUM}_darwin-arm64.dmg"
-          upload_asset linux-amd64 "EOS App (Linux x64)" "eos-app_${VERNUM}_linux-amd64.tar.gz"
-          upload_asset linux-arm64 "EOS App (Linux ARM64)" "eos-app_${VERNUM}_linux-arm64.tar.gz"
+          upload_asset windows-amd64 "EOS Agent (Windows x64)" "eos-app-setup-$VERSION.exe"
+          upload_asset darwin-amd64 "EOS Agent (macOS Intel)" "eos-app_${VERNUM}_darwin-amd64.dmg"
+          upload_asset darwin-arm64 "EOS Agent (macOS Apple Silicon)" "eos-app_${VERNUM}_darwin-arm64.dmg"
+          upload_asset linux-amd64 "EOS Agent (Linux x64)" "eos-app_${VERNUM}_linux-amd64.tar.gz"
+          upload_asset linux-arm64 "EOS Agent (Linux ARM64)" "eos-app_${VERNUM}_linux-arm64.tar.gz"
           echo "admin sync done: $VERNUM (quality=$QUALITY)"
 
