@@ -33,7 +33,7 @@ def record(args):
     root = Path.cwd()
     version = args.version.removeprefix('v')
     channel = args.channel
-    names = {'stable': 'EOS', 'beta': 'EOS Beta', 'dev': 'EOS Dev'}
+    names = {'stable': 'EOS Agent', 'beta': 'EOS Agent Beta', 'dev': 'EOS Agent Dev'}
     bundle_id = 'com.eosaios.eos-app' + ('' if channel == 'stable' else '.' + channel)
     stage = root / 'dist' / f'eos-app_{version}_{args.platform}'
     if args.platform.startswith('darwin-'):
