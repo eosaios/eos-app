@@ -99,6 +99,7 @@ def record(args):
         'core_source': revision(root.parent / 'eos-core-rs'),
         'distribution_source': revision(root.parent / 'release-tools'),
         'workflow_run_id': os.environ['GITHUB_RUN_ID'],
+        'core_build_workflow_run_id': os.environ.get('EOS_REUSED_CORE_RUN_ID') or os.environ['GITHUB_RUN_ID'],
         'build_workflow_run_id': os.environ.get('EOS_REUSED_BUILD_RUN_ID', os.environ['GITHUB_RUN_ID']),
         'expected_catalog_sha256': expected_catalog_sha,
         'bundle_id': bundle_id, 'app_binary_sha256': sha(binary),

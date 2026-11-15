@@ -37,6 +37,10 @@ on:
         type: choice
         options: [all, darwin-arm64, remaining-stable]
         default: all
+      reuse_core_run_id:
+        description: "仅重建应用：复用已成功候选的同一冻结内核（保持 publish=false）"
+        required: false
+        default: ""
       reuse_run_id:
         description: "Windows 构建恢复：复用此已完成运行的 macOS/Linux 产物，仅重建 Windows（正常发版留空）"
         required: false
@@ -73,6 +77,7 @@ jobs:
           VERSION: ${{ inputs.version || github.ref_name }}
           BUILD_TARGET: ${{ inputs.build_target || 'all' }}
           PUBLISH: ${{ inputs.publish }}
+          CORE_RUN: ${{ inputs.reuse_core_run_id }}
         run: |
           set -euo pipefail
           if [ "$CHANNEL" = beta ]; then
@@ -82,6 +87,18 @@ jobs:
           else
             [[ "$VERSION" != *-* ]] || { echo "::error::Stable version cannot be a prerelease"; exit 1; }
           fi
+
+      - name: Validate reused Core candidate
+        if: inputs.reuse_core_run_id != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CORE_RUN: ${{ inputs.reuse_core_run_id }}
+          PUBLISH: ${{ inputs.publish }}
+        run: |
+          set -euo pipefail
+          [[ "$CORE_RUN" =~ ^[0-9]+$ && "$PUBLISH" != true ]] || { echo "::error::Core recovery requires a numeric run and publish=false"; exit 1; }
+          gh run view "$CORE_RUN" --repo "$GITHUB_REPOSITORY" --json status,conclusion --jq '.status == "completed" and .conclusion == "success"' | grep -x true
 
       # eos-app 的 go.mod replace github.com/eosaios/eos => ../eos-cli，
       # 布局必须保持 app 与 eos-cli 同级。
@@ -130,6 +147,7 @@ jobs:
           node-version: "22"
 
       - name: Install Rust target
+        if: inputs.reuse_core_run_id == ''
         run: rustup target add ${{ matrix.triple }}
 
       - name: Install musl toolchain (linux musl)
@@ -149,16 +167,19 @@ jobs:
         run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.5
 
       - uses: Swatinem/rust-cache@v2
+        if: inputs.reuse_core_run_id == ''
         with:
           workspaces: eos-core-rs
           key: ${{ matrix.triple }}
           cache-on-failure: true
 
       - name: Build sidecar (release)
+        if: inputs.reuse_core_run_id == ''
         working-directory: eos-core-rs
         run: cargo build --release --target ${{ matrix.triple }} -p eos-core-bin
 
       - name: Sign and package sidecar
+        if: inputs.reuse_core_run_id == ''
         shell: pwsh
         working-directory: eos-core-rs
         env:
@@ -177,6 +198,24 @@ jobs:
           & pwsh -NoProfile -File scripts/package-public-artifact.ps1 `
             -Target "${{ matrix.triple }}" `
             -PrivateKeyPath scripts/eos-signing-key.pem
+
+      - name: Download verified Core
+        if: inputs.reuse_core_run_id != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: core-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: reused-core
+          run-id: ${{ inputs.reuse_core_run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Restore the exact frozen Core
+        if: inputs.reuse_core_run_id != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 release-tools/scripts/restore-verified-core.py --source reused-core \
+            --destination "eos-core-rs/pkg/coreapi/sidecar/core/${{ matrix.triple }}" \
+            --expected-commit "$(git -C eos-core-rs rev-parse HEAD)" --target "${{ matrix.triple }}"
 
       - name: Verify sidecar sha256
         shell: bash
@@ -206,6 +245,11 @@ jobs:
           mkdir -p "app/core/${{ matrix.triple }}"
           cp "eos-core-rs/pkg/coreapi/sidecar/core/${{ matrix.triple }}"/eos-core* "app/core/${{ matrix.triple }}/"
           cp "eos-core-rs/pkg/coreapi/sidecar/core/${{ matrix.triple }}/manifest.json" "app/core/${{ matrix.triple }}/"
+
+      - name: Verify the runtime Core signature
+        shell: bash
+        working-directory: app
+        run: go run ../release-tools/scripts/check-core-signature.go --manifest "core/${{ matrix.triple }}/manifest.json" --platform "${{ matrix.goos }}-${{ matrix.goarch }}"
 
       - name: Build release archive
         shell: bash
@@ -337,6 +381,7 @@ jobs:
         env:
           RELEASE_CHANNEL: ${{ inputs.channel || 'stable' }}
           RELEASE_VERSION: ${{ inputs.version || github.ref_name }}
+          EOS_REUSED_CORE_RUN_ID: ${{ inputs.reuse_core_run_id }}
         run: python3 ../release-tools/scripts/record-app-build.py --channel "$RELEASE_CHANNEL" --version "$RELEASE_VERSION" --platform "${{ matrix.goos }}-${{ matrix.goarch }}" --triple "${{ matrix.triple }}"
 
       # build_release.go 会留下同名 staging 目录（exe+core 展开态），归档与
