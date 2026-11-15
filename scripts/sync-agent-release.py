@@ -122,6 +122,14 @@ def upload(root, name, expected, notes, token):
     body = bytearray()
     for key, value in fields.items():
         body.extend(f'--{boundary}\r\nContent-Disposition: form-data; name="{key}"\r\n\r\n{value}\r\n'.encode())
+    manifest = {'app_key': 'eos-app', 'version': expected['product_version'],
+                'platform': expected['platform'], 'channel': 'stable',
+                'environment': 'production', 'source_commit': expected['commit'],
+                'build_id': expected['commit'], 'bundle_id': 'com.eosaios.eos-app',
+                'file': name, 'file_size': expected['file_size'],
+                'sha256': expected['sha256_hash'], 'distribution_ready': True}
+    body.extend(f'--{boundary}\r\nContent-Disposition: form-data; name="build_manifest"; filename="release-manifest.json"\r\nContent-Type: application/json\r\n\r\n'.encode())
+    body.extend(json.dumps(manifest).encode()); body.extend(b'\r\n')
     body.extend(f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="{name}"\r\nContent-Type: application/octet-stream\r\n\r\n'.encode())
     body.extend((root / name).read_bytes()); body.extend(f'\r\n--{boundary}--\r\n'.encode())
     req = urllib.request.Request(ADMIN + PREFIX + '/versions/upload', data=body,
