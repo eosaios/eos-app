@@ -69,7 +69,7 @@ Click the preview for the full walkthrough — conversation, task execution, and
 
 Example workspace on macOS; layout can differ by system and release:
 
-![EOS Agent main workspace](docs/images/workspace-overview.png)
+![EOS Agent main workspace](docs/images/eos-agent-workspace-20261115.png)
 
 - Left: new chat, skills and apps, automation, plus tasks / worktree, usage / network / memory / help
 - Center: conversation and the main workflow

@@ -67,9 +67,9 @@ macOS / Windows 有原生内嵌浏览器宿主；Linux 默认使用独立浏览�
 
 点击预览观看完整演示——对话协作、任务执行与文件生成。
 
-以下为 macOS 示例界面；其他系统及发行版本的布局可能不同：
+以下界面使用演示数据；其他系统及发行版本的布局可能不同：
 
-![EOS Agent 主工作台](docs/images/workspace-overview.png)
+![EOS Agent 主工作台](docs/images/eos-agent-workspace-20261115.png)
 
 - 左侧：新对话、技能和应用、自动化，以及任务 / 工作树、用量 / 网络 / 记忆 / 帮助
 - 中央：对话与主工作流
