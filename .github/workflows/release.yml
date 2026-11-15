@@ -38,7 +38,7 @@ on:
         options: [all, darwin-arm64, remaining-stable]
         default: all
       reuse_core_run_id:
-        description: "仅重建应用：复用已成功候选的同一冻结内核（保持 publish=false）"
+        description: "仅重建应用：复用已完成构建、签名、校验的冻结内核（保持 publish=false）"
         required: false
         default: ""
       reuse_run_id:
@@ -88,18 +88,6 @@ jobs:
             [[ "$VERSION" != *-* ]] || { echo "::error::Stable version cannot be a prerelease"; exit 1; }
           fi
 
-      - name: Validate reused Core candidate
-        if: inputs.reuse_core_run_id != ''
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          CORE_RUN: ${{ inputs.reuse_core_run_id }}
-          PUBLISH: ${{ inputs.publish }}
-        run: |
-          set -euo pipefail
-          [[ "$CORE_RUN" =~ ^[0-9]+$ && "$PUBLISH" != true ]] || { echo "::error::Core recovery requires a numeric run and publish=false"; exit 1; }
-          gh run view "$CORE_RUN" --repo "$GITHUB_REPOSITORY" --json status,conclusion --jq '.status == "completed" and .conclusion == "success"' | grep -x true
-
       # eos-app 的 go.mod replace github.com/eosaios/eos => ../eos-cli，
       # 布局必须保持 app 与 eos-cli 同级。
       - name: Checkout app source
@@ -130,6 +118,18 @@ jobs:
         with:
           ref: ${{ github.sha }}
           path: release-tools
+
+      - name: Validate reused Core candidate
+        if: inputs.reuse_core_run_id != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CORE_RUN: ${{ inputs.reuse_core_run_id }}
+          PUBLISH: ${{ inputs.publish }}
+        run: |
+          set -euo pipefail
+          [[ "$CORE_RUN" =~ ^[0-9]+$ && "$PUBLISH" != true ]] || { echo "::error::Core recovery requires a numeric run and publish=false"; exit 1; }
+          gh run view "$CORE_RUN" --repo "$GITHUB_REPOSITORY" --json status,jobs | python3 release-tools/scripts/check-core-recovery-run.py '${{ matrix.goos }}/${{ matrix.goarch }}'
 
       - name: Authenticate private Go dependencies
         shell: bash
