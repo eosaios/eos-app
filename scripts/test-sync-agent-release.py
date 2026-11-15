@@ -5,11 +5,29 @@ import tempfile
 from unittest.mock import patch
 import io
 import unittest
+from email import policy
+from email.parser import BytesParser
 
 spec=importlib.util.spec_from_file_location('sync',Path(__file__).with_name('sync-agent-release.py'))
 sync=importlib.util.module_from_spec(spec);spec.loader.exec_module(sync)
 
 class ReleaseValidation(unittest.TestCase):
+    def test_upload_carries_exact_artifact_and_existing_upgrade_identity(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);name='eos-agent-setup-v1.0.19.exe';data=b'verified installer';(root/name).write_bytes(data)
+            expected={'application_id':2,'product_version':'1.0.19','commit':'a'*40,'platform':'windows-amd64','file_size':len(data),'sha256_hash':sync.digest(data)}
+            response=io.BytesIO(b'{"data":{}}')
+            with patch.object(sync.CLIENT,'open',return_value=response) as opened:
+                sync.upload(root,name,expected,'Release notes','fixture-token')
+            request=opened.call_args.args[0]
+            message=BytesParser(policy=policy.default).parsebytes(('Content-Type: '+request.headers['Content-type']+'\r\n\r\n').encode()+request.data)
+            parts={part.get_param('name',header='content-disposition'):part for part in message.iter_parts()}
+            self.assertEqual(parts['file'].get_payload(decode=True),data)
+            self.assertEqual(parts['file'].get_filename(),name)
+            manifest=json.loads(parts['build_manifest'].get_payload(decode=True))
+            self.assertEqual(manifest,{'app_key':'eos-app','version':'1.0.19','platform':'windows-amd64','channel':'stable','environment':'production','source_commit':'a'*40,'build_id':'a'*40,'bundle_id':'com.eosaios.eos-app','file':name,'file_size':len(data),'sha256':sync.digest(data),'distribution_ready':True})
+            self.assertEqual(parts['is_current'].get_content().strip(),'false')
+
     def fixture(self, root):
         files={}
         for name,(platform,kind) in sync.expected_files('1.0.19').items():
