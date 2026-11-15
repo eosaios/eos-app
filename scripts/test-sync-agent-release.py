@@ -12,6 +12,17 @@ spec=importlib.util.spec_from_file_location('sync',Path(__file__).with_name('syn
 sync=importlib.util.module_from_spec(spec);spec.loader.exec_module(sync)
 
 class ReleaseValidation(unittest.TestCase):
+    def test_download_uses_real_updater_request_and_rejects_changed_bytes(self):
+        name='eos-agent-setup-v1.0.19.exe';data=b'approved installer bytes'
+        row={'application_id':2,'product_version':'1.0.19','platform':'windows-amd64','file_url':'https://dl.eosaios.com/versions/2/1.0.19/windows-amd64/13ffca0c-ce96-45e4-82ca-d9e85d8f7272/'+name,'file_size':len(data),'sha256_hash':sync.digest(data)}
+        with patch.object(sync.CLIENT,'open',return_value=io.BytesIO(data))as opened:
+            sync.verify_download(row,name)
+        request=opened.call_args.args[0]
+        self.assertEqual(request.full_url,row['file_url'])
+        self.assertEqual(request.get_header('User-agent'),'EOS-App-Update')
+        with patch.object(sync.CLIENT,'open',return_value=io.BytesIO(data[:-1]+b'!')):
+            with self.assertRaises(ValueError):sync.verify_download(row,name)
+
     def test_upload_carries_exact_artifact_and_existing_upgrade_identity(self):
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory);name='eos-agent-setup-v1.0.19.exe';data=b'verified installer';(root/name).write_bytes(data)
