@@ -35,17 +35,17 @@ def record(args):
     channel = args.channel
     names = {'stable': 'EOS Agent', 'beta': 'EOS Agent Beta', 'dev': 'EOS Agent Dev'}
     bundle_id = 'com.eosaios.eos-app' + ('' if channel == 'stable' else '.' + channel)
-    stage = root / 'dist' / f'eos-app_{version}_{args.platform}'
+    stage = root / 'dist' / f'eos-agent_{version}_{args.platform}'
     if args.platform.startswith('darwin-'):
         bundle = stage / (names[channel] + '.app')
         info = plistlib.loads((bundle / 'Contents/Info.plist').read_bytes())
         assert (info['CFBundleIdentifier'], info['CFBundleShortVersionString']) == (bundle_id, version)
         scheme = 'eosagent' + ('' if channel == 'stable' else '-' + channel)
         assert info['CFBundleURLTypes'][0]['CFBundleURLSchemes'] == [scheme]
-        binary = bundle / 'Contents/MacOS/eos-app'
+        binary = bundle / 'Contents/MacOS/eos-agent'
         core_dir = bundle / 'Contents/Resources/core' / args.triple
     else:
-        binary = stage / ('eos-app.exe' if args.platform.startswith('windows-') else 'eos-app')
+        binary = stage / ('eos-agent.exe' if args.platform.startswith('windows-') else 'eos-agent')
         core_dir = stage / 'core' / args.triple
     manifest = json.loads((core_dir / 'manifest.json').read_text())
     core_sha = sha(core_dir / manifest['binary'])

@@ -4,8 +4,8 @@
 
 **桌面端 AI 编程工作台。** 在同一个窗口与 AI 协作处理本地项目，并检查文件改动、命令输出和任务进度。
 
-- 下载安装包：[Releases](https://github.com/eosaios/eos-app/releases)（始终以最新 Release 为准）
-- 问题反馈：[Issues](https://github.com/eosaios/eos-app/issues)
+- 下载安装包：[Releases](https://github.com/eosaios/eos-agent/releases)（始终以最新 Release 为准）
+- 问题反馈：[Issues](https://github.com/eosaios/eos-agent/issues)
 - 终端版：[EOS CLI](https://github.com/eosaios/eos)
 
 本仓库是 EOS Agent 的**官方发行仓**：提供安装包、版本说明与产品介绍，**不包含桌面端源码**。核心能力基于 [EOS CLI](https://github.com/eosaios/eos) 的 Rust 内核，官方发行包附带 Core 完整性校验（SHA-256 与 Ed25519 验签）。Core 校验与操作系统对安装包的签名验证是不同机制，后者以具体发行包为准。
@@ -53,7 +53,7 @@ macOS / Windows 有原生内嵌浏览器宿主；Linux 默认使用独立浏览�
 | macOS | Intel / Apple Silicon | dmg 拖拽安装，或便携 tar.gz |
 | Linux | amd64 / arm64 | tar.gz |
 
-1. 打开 [Releases](https://github.com/eosaios/eos-app/releases)，下载对应平台的最新安装包
+1. 打开 [Releases](https://github.com/eosaios/eos-agent/releases)，下载对应平台的最新安装包
 2. 需要时用同页的 `SHA256SUMS.txt` 校验
 3. 安装后可在应用内检查并下载更新，由用户发起安装。Windows / macOS 使用各自安装流程；Linux 打开下载目录后需自行解压替换。
 
@@ -79,7 +79,7 @@ macOS / Windows 有原生内嵌浏览器宿主；Linux 默认使用独立浏览�
 
 **桌面端源码不公开，官方二进制包可免费用于个人与商业工作。** 具体授权见 [LICENSE](./LICENSE)。
 
-这份免费使用授权也适用于此前由 EOSAIOS 发布的官方未修改二进制包。旧安装包随附文件或历史版本快照可能仍保留先前条款，当前授权以[主分支许可证](https://github.com/eosaios/eos-app/blob/main/LICENSE)第六条第 2 项为准。
+这份免费使用授权也适用于此前由 EOSAIOS 发布的官方未修改二进制包。旧安装包随附文件或历史版本快照可能仍保留先前条款，当前授权以[主分支许可证](https://github.com/eosaios/eos-agent/blob/main/LICENSE)第六条第 2 项为准。
 
 - 个人与组织均可免费下载安装、运行官方未修改安装包，用于企业内部工作、商业软件开发和收费客户项目，无需单独申请商业使用授权
 - 原样分享官方安装包与公开文档时，请保留许可证、版权声明与官方来源
@@ -97,5 +97,5 @@ macOS / Windows 有原生内嵌浏览器宿主；Linux 默认使用独立浏览�
 
 ## 联系
 
-- 问题反馈：https://github.com/eosaios/eos-app/issues
+- 问题反馈：https://github.com/eosaios/eos-agent/issues
 - 合作 / 再分发授权咨询：legal@eosaios.com

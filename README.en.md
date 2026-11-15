@@ -4,8 +4,8 @@
 
 **A desktop AI coding workspace.** Work with AI on local projects and inspect file changes, command output and task progress in one window.
 
-- Download: [Releases](https://github.com/eosaios/eos-app/releases) (always use the latest release)
-- Issues: [Issues](https://github.com/eosaios/eos-app/issues)
+- Download: [Releases](https://github.com/eosaios/eos-agent/releases) (always use the latest release)
+- Issues: [Issues](https://github.com/eosaios/eos-agent/issues)
 - Terminal edition: [EOS CLI](https://github.com/eosaios/eos)
 
 This repository is the **official distribution repo** for EOS Agent: installers, release notes, and product information — **not** the desktop source code. Core capabilities are built on the Rust core of [EOS CLI](https://github.com/eosaios/eos). Official packages include Core integrity checks (SHA-256 and Ed25519 verification). Core verification is separate from operating-system signing of the application package, which depends on the particular release.
@@ -53,7 +53,7 @@ Integrated terminal, system tray, single instance and desktop notifications. The
 | macOS | Intel / Apple Silicon | dmg drag-and-drop, or portable tar.gz |
 | Linux | amd64 / arm64 | tar.gz |
 
-1. Open [Releases](https://github.com/eosaios/eos-app/releases) and download the latest package for your platform
+1. Open [Releases](https://github.com/eosaios/eos-agent/releases) and download the latest package for your platform
 2. Verify with `SHA256SUMS.txt` on the same page if needed
 3. Check and download updates in-app, then initiate installation. Windows / macOS use their platform installer flows; Linux opens the download folder for manual extraction and replacement.
 
@@ -79,7 +79,7 @@ Example workspace on macOS; layout can differ by system and release:
 
 **Desktop source code is not public. Official binaries are free for personal and commercial work.** See [LICENSE](./LICENSE) for the full terms.
 
-This free-use grant also covers official, unmodified EOSAIOS binaries released previously. Older packages or historical snapshots may still contain earlier wording; see section 6.2 of the [current main-branch license](https://github.com/eosaios/eos-app/blob/main/LICENSE) for the current grant.
+This free-use grant also covers official, unmodified EOSAIOS binaries released previously. Older packages or historical snapshots may still contain earlier wording; see section 6.2 of the [current main-branch license](https://github.com/eosaios/eos-agent/blob/main/LICENSE) for the current grant.
 
 - Individuals and organizations may use official, unmodified binaries for internal work, commercial software development and paid client projects without a separate commercial-use license
 - Unmodified sharing of official packages and public docs is allowed with the license, copyright notices and official source retained
@@ -97,5 +97,5 @@ Model requests go to your configured endpoint and can include messages, file con
 
 ## Contact
 
-- Issues: https://github.com/eosaios/eos-app/issues
+- Issues: https://github.com/eosaios/eos-agent/issues
 - Partnerships / redistribution licensing: legal@eosaios.com
