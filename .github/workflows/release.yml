@@ -375,6 +375,16 @@ jobs:
           cp "$EXPECTED" "dist/expected-capability-catalog-$PLATFORM.json"
           cp "$RUNNER_TEMP/live-capability-catalog-$PLATFORM/result.json" "dist/live-capability-catalog-$PLATFORM.json"
 
+      - name: Verify packaged workspace and thread restart
+        shell: bash
+        working-directory: app
+        run: >-
+          python3 ../release-tools/scripts/verify-workspace-restart.py
+          --platform "${{ matrix.goos }}-${{ matrix.goarch }}"
+          --triple "${{ matrix.triple }}"
+          --version "${{ inputs.version }}"
+          --channel "${{ inputs.channel || 'stable' }}"
+
       - name: Record packaged provenance
         shell: bash
         working-directory: app
