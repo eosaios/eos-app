@@ -1,6 +1,6 @@
 name: Release
 
-# EOS App 三端 Release 构建（Windows / macOS / Linux，五目标矩阵），
+# EOS Agent 三端 Release 构建（Windows / macOS / Linux，五目标矩阵），
 # 产物与校验文件发布到本仓库 Release。
 
 on:
@@ -37,6 +37,10 @@ on:
         type: choice
         options: [all, darwin-arm64, remaining-stable]
         default: all
+      reuse_core_run_id:
+        description: "仅重建应用：复用已完成构建、签名、校验的冻结内核（保持 publish=false）"
+        required: false
+        default: ""
       reuse_run_id:
         description: "Windows 构建恢复：复用此已完成运行的 macOS/Linux 产物，仅重建 Windows（正常发版留空）"
         required: false
@@ -73,6 +77,7 @@ jobs:
           VERSION: ${{ inputs.version || github.ref_name }}
           BUILD_TARGET: ${{ inputs.build_target || 'all' }}
           PUBLISH: ${{ inputs.publish }}
+          CORE_RUN: ${{ inputs.reuse_core_run_id }}
         run: |
           set -euo pipefail
           if [ "$CHANNEL" = beta ]; then
@@ -114,6 +119,18 @@ jobs:
           ref: ${{ github.sha }}
           path: release-tools
 
+      - name: Validate reused Core candidate
+        if: inputs.reuse_core_run_id != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CORE_RUN: ${{ inputs.reuse_core_run_id }}
+          PUBLISH: ${{ inputs.publish }}
+        run: |
+          set -euo pipefail
+          [[ "$CORE_RUN" =~ ^[0-9]+$ && "$PUBLISH" != true ]] || { echo "::error::Core recovery requires a numeric run and publish=false"; exit 1; }
+          gh run view "$CORE_RUN" --repo "$GITHUB_REPOSITORY" --json status,jobs | python3 release-tools/scripts/check-core-recovery-run.py '${{ matrix.goos }}/${{ matrix.goarch }}'
+
       - name: Authenticate private Go dependencies
         shell: bash
         env:
@@ -122,13 +139,15 @@ jobs:
 
       - uses: actions/setup-go@v6
         with:
-          go-version: "1.25"
+          go-version-file: app/go.mod
+          cache-dependency-path: app/go.sum
 
       - uses: actions/setup-node@v5
         with:
           node-version: "22"
 
       - name: Install Rust target
+        if: inputs.reuse_core_run_id == ''
         run: rustup target add ${{ matrix.triple }}
 
       - name: Install musl toolchain (linux musl)
@@ -148,16 +167,19 @@ jobs:
         run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.5
 
       - uses: Swatinem/rust-cache@v2
+        if: inputs.reuse_core_run_id == ''
         with:
           workspaces: eos-core-rs
           key: ${{ matrix.triple }}
           cache-on-failure: true
 
       - name: Build sidecar (release)
+        if: inputs.reuse_core_run_id == ''
         working-directory: eos-core-rs
         run: cargo build --release --target ${{ matrix.triple }} -p eos-core-bin
 
       - name: Sign and package sidecar
+        if: inputs.reuse_core_run_id == ''
         shell: pwsh
         working-directory: eos-core-rs
         env:
@@ -177,6 +199,24 @@ jobs:
             -Target "${{ matrix.triple }}" `
             -PrivateKeyPath scripts/eos-signing-key.pem
 
+      - name: Download verified Core
+        if: inputs.reuse_core_run_id != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: core-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: reused-core
+          run-id: ${{ inputs.reuse_core_run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Restore the exact frozen Core
+        if: inputs.reuse_core_run_id != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 release-tools/scripts/restore-verified-core.py --source reused-core \
+            --destination "eos-core-rs/pkg/coreapi/sidecar/core/${{ matrix.triple }}" \
+            --expected-commit "$(git -C eos-core-rs rev-parse HEAD)" --target "${{ matrix.triple }}"
+
       - name: Verify sidecar sha256
         shell: bash
         run: |
@@ -189,6 +229,15 @@ jobs:
           echo "manifest=$manifest_hash binary=$actual_hash"
           [ "$manifest_hash" = "$actual_hash" ] || { echo "::error::sha256 不一致"; exit 1; }
 
+      - name: Preserve verified sidecar for candidate recovery
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: |
+            eos-core-rs/pkg/coreapi/sidecar/core/${{ matrix.triple }}/eos-core*
+            eos-core-rs/pkg/coreapi/sidecar/core/${{ matrix.triple }}/manifest.json
+          if-no-files-found: error
+
       - name: Stage sidecar into app core dir
         shell: bash   # Windows runner 默认 shell 是 pwsh，bash 语法必须显式声明
         run: |
@@ -196,6 +245,11 @@ jobs:
           mkdir -p "app/core/${{ matrix.triple }}"
           cp "eos-core-rs/pkg/coreapi/sidecar/core/${{ matrix.triple }}"/eos-core* "app/core/${{ matrix.triple }}/"
           cp "eos-core-rs/pkg/coreapi/sidecar/core/${{ matrix.triple }}/manifest.json" "app/core/${{ matrix.triple }}/"
+
+      - name: Verify the runtime Core signature
+        shell: bash
+        working-directory: app
+        run: go run ../release-tools/scripts/check-core-signature.go --manifest "core/${{ matrix.triple }}/manifest.json" --platform "${{ matrix.goos }}-${{ matrix.goarch }}"
 
       - name: Build release archive
         shell: bash
@@ -220,7 +274,7 @@ jobs:
           ls -la dist
 
       # Windows 安装器：Inno Setup（installer.iss 与历版 setup 同源）。
-      # 从 staging 取 exe（.iss 读 output\eos-app.exe），内核走已 staged 的
+      # 从 staging 取 exe（.iss 读 output\eos-agent.exe），内核走已 staged 的
       # core\x86_64-pc-windows-gnu\。pwsh 调 iscc——bash 下 /D 会被 MSYS
       # 路径转换破坏。
       - name: Build Windows installer (Inno Setup)
@@ -234,7 +288,7 @@ jobs:
           $dirVersion = $version.Trim().TrimStart('v')
           if ([string]::IsNullOrWhiteSpace($dirVersion)) { $dirVersion = "dev" }
           New-Item -ItemType Directory -Force -Path output | Out-Null
-          Copy-Item -Force "dist/eos-app_${dirVersion}_windows-amd64/eos-app.exe" "output/eos-app.exe"
+          Copy-Item -Force "dist/eos-agent_${dirVersion}_windows-amd64/eos-agent.exe" "output/eos-agent.exe"
           & iscc "/DMyAppVersion=$version" installer.iss
           if ($LASTEXITCODE -ne 0) { throw "iscc failed (exit $LASTEXITCODE)" }
           Get-ChildItem dist
@@ -247,7 +301,7 @@ jobs:
         run: |
           $version = "${{ inputs.version || github.ref_name }}"
           $install = Join-Path $env:RUNNER_TEMP "EOS-protocol-check"
-          $installer = Resolve-Path "dist/eos-app-setup-$version.exe"
+          $installer = Resolve-Path "dist/eos-agent-setup-$version.exe"
           # Start-Process -Wait also waits for the EOS client launched by Inno.
           # Wait only for the installer, then inspect the persisted URL handler.
           $process = Start-Process $installer -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CURRENTUSER", "/DIR=$install" -PassThru
@@ -258,9 +312,9 @@ jobs:
           $process.Refresh()
           if ($process.ExitCode -ne 0) { throw "Installer failed: $($process.ExitCode)" }
           $command = (Get-Item 'HKCU:\Software\Classes\eosagent\shell\open\command').GetValue('')
-          if ($command -ne "`"$install\eos-app.exe`" `"%1`"") { throw "Incorrect login protocol command: $command" }
+          if ($command -ne "`"$install\eos-agent.exe`" `"%1`"") { throw "Incorrect login protocol command: $command" }
           if (-not (Get-ItemProperty 'HKCU:\Software\Classes\eosagent').PSObject.Properties['URL Protocol']) { throw "Missing URL Protocol marker" }
-          Get-Process eos-app,eos-core -ErrorAction SilentlyContinue | Stop-Process -Force
+          Get-Process eos-agent,eos-app,eos-core -ErrorAction SilentlyContinue | Stop-Process -Force
           Write-Output "Windows installer registered eosagent for the installed executable."
 
       - name: Verify Linux login protocol registration
@@ -273,10 +327,10 @@ jobs:
           export XDG_CONFIG_HOME="$RUNNER_TEMP/eos-protocol-config"
           mkdir -p "$XDG_CONFIG_HOME"
           VERSION="${{ inputs.version || github.ref_name }}"
-          bash "dist/eos-app_${VERSION#v}_${{ matrix.goos }}-${{ matrix.goarch }}/install.sh"
-          test -x "$XDG_DATA_HOME/eos-app/eos-app"
-          test "$(xdg-mime query default x-scheme-handler/eosagent)" = eos-app.desktop
-          grep -F 'MimeType=x-scheme-handler/eosagent;' "$XDG_DATA_HOME/applications/eos-app.desktop"
+          bash "dist/eos-agent_${VERSION#v}_${{ matrix.goos }}-${{ matrix.goarch }}/install.sh"
+          test -x "$XDG_DATA_HOME/eos-app/eos-agent"
+          test "$(xdg-mime query default x-scheme-handler/eosagent)" = eos-agent.desktop
+          grep -F 'MimeType=x-scheme-handler/eosagent;' "$XDG_DATA_HOME/applications/eos-agent.desktop"
 
       - name: Verify packaged legacy upgrade and restart
         shell: bash
@@ -287,18 +341,18 @@ jobs:
           PLATFORM="${{ matrix.goos }}-${{ matrix.goarch }}"
           if [ "${{ matrix.goos }}" = windows ]; then
             CORE="$RUNNER_TEMP/EOS-protocol-check/core/${{ matrix.triple }}/eos-core.exe"
-            APP="$RUNNER_TEMP/EOS-protocol-check/eos-app.exe"
+            APP="$RUNNER_TEMP/EOS-protocol-check/eos-agent.exe"
           elif [ "${{ matrix.goos }}" = linux ]; then
             CORE="$RUNNER_TEMP/eos-protocol-data/eos-app/core/${{ matrix.triple }}/eos-core"
-            APP="$RUNNER_TEMP/eos-protocol-data/eos-app/eos-app"
+            APP="$RUNNER_TEMP/eos-protocol-data/eos-app/eos-agent"
           else
-            NAME=EOS
-            if [ "${{ inputs.channel }}" = beta ]; then NAME="EOS Beta"; fi
-            if [ "${{ inputs.channel }}" = dev ]; then NAME="EOS Dev"; fi
-            BUNDLE="dist/eos-app_${VERSION#v}_$PLATFORM/$NAME.app"
+            NAME="EOS Agent"
+            if [ "${{ inputs.channel }}" = beta ]; then NAME="EOS Agent Beta"; fi
+            if [ "${{ inputs.channel }}" = dev ]; then NAME="EOS Agent Dev"; fi
+            BUNDLE="dist/eos-agent_${VERSION#v}_$PLATFORM/$NAME.app"
             codesign --verify --deep --strict "$BUNDLE"
             CORE="$BUNDLE/Contents/Resources/core/${{ matrix.triple }}/eos-core"
-            APP="$BUNDLE/Contents/MacOS/eos-app"
+            APP="$BUNDLE/Contents/MacOS/eos-agent"
           fi
           go version -m "$APP" > "dist/build-identity-$PLATFORM.txt"
           grep -F "vcs.revision=$(git rev-parse HEAD)" "dist/build-identity-$PLATFORM.txt"
@@ -327,6 +381,7 @@ jobs:
         env:
           RELEASE_CHANNEL: ${{ inputs.channel || 'stable' }}
           RELEASE_VERSION: ${{ inputs.version || github.ref_name }}
+          EOS_REUSED_CORE_RUN_ID: ${{ inputs.reuse_core_run_id }}
         run: python3 ../release-tools/scripts/record-app-build.py --channel "$RELEASE_CHANNEL" --version "$RELEASE_VERSION" --platform "${{ matrix.goos }}-${{ matrix.goarch }}" --triple "${{ matrix.triple }}"
 
       # build_release.go 会留下同名 staging 目录（exe+core 展开态），归档与
@@ -334,7 +389,7 @@ jobs:
       - name: Clean staging dirs
         shell: bash
         working-directory: app
-        run: rm -rf dist/eos-app_*/
+        run: rm -rf dist/eos-agent_*/
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -379,10 +434,10 @@ jobs:
         run: |
           set -euo pipefail
           VERNUM="${VERSION#v}"
-          for file in "eos-app-setup-$VERSION.exe" "eos-app_${VERNUM}_windows-amd64.zip" \
-            "eos-app_${VERNUM}_darwin-amd64.dmg" "eos-app_${VERNUM}_darwin-amd64.tar.gz" \
-            "eos-app_${VERNUM}_darwin-arm64.dmg" "eos-app_${VERNUM}_darwin-arm64.tar.gz" \
-            "eos-app_${VERNUM}_linux-amd64.tar.gz" "eos-app_${VERNUM}_linux-arm64.tar.gz"; do
+          for file in "eos-agent-setup-$VERSION.exe" "eos-agent_${VERNUM}_windows-amd64.zip" \
+            "eos-agent_${VERNUM}_darwin-amd64.dmg" "eos-agent_${VERNUM}_darwin-amd64.tar.gz" \
+            "eos-agent_${VERNUM}_darwin-arm64.dmg" "eos-agent_${VERNUM}_darwin-arm64.tar.gz" \
+            "eos-agent_${VERNUM}_linux-amd64.tar.gz" "eos-agent_${VERNUM}_linux-arm64.tar.gz"; do
             [ -s "dist/$file" ] || { echo "::error::缺少发行产物 $file"; exit 1; }
           done
 
@@ -401,7 +456,7 @@ jobs:
           NOTES_FILE="docs/releases/$VERSION.md"
           [ -s "$NOTES_FILE" ] || { echo "::error::缺少发布说明 $NOTES_FILE"; exit 1; }
           gh release create "$VERSION" dist/* \
-            --title "EOS App $VERSION" \
+            --title "EOS Agent $VERSION" \
             --notes-file "$NOTES_FILE" \
             --repo "$GITHUB_REPOSITORY"
 
@@ -449,7 +504,7 @@ jobs:
           # pwsh 不搜当前目录，必须 .\ 显式相对路径调用
           .\wingetcreate.exe update EOSAIOS.EOSApp `
             --version $verNum `
-            --urls "https://github.com/${{ github.repository }}/releases/download/$VERSION/eos-app-setup-$VERSION.exe" `
+            --urls "https://github.com/${{ github.repository }}/releases/download/$VERSION/eos-agent-setup-$VERSION.exe" `
             --token $env:WINGET_TOKEN `
             --submit
 
@@ -488,11 +543,11 @@ jobs:
             | jq -r '.data.access_token')"
 
           gh release download "$VERSION" --repo "$GITHUB_REPOSITORY" --dir assets \
-            --pattern "eos-app-setup-$VERSION.exe" \
-            --pattern "eos-app_${VERNUM}_darwin-amd64.dmg" \
-            --pattern "eos-app_${VERNUM}_darwin-arm64.dmg" \
-            --pattern "eos-app_${VERNUM}_linux-amd64.tar.gz" \
-            --pattern "eos-app_${VERNUM}_linux-arm64.tar.gz"
+            --pattern "eos-agent-setup-$VERSION.exe" \
+            --pattern "eos-agent_${VERNUM}_darwin-amd64.dmg" \
+            --pattern "eos-agent_${VERNUM}_darwin-arm64.dmg" \
+            --pattern "eos-agent_${VERNUM}_linux-amd64.tar.gz" \
+            --pattern "eos-agent_${VERNUM}_linux-arm64.tar.gz"
           ls -la assets/
 
           NOTES=$(gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" --json body -q .body)
@@ -531,10 +586,10 @@ jobs:
             fi
           }
 
-          upload_asset windows-amd64 "EOS App (Windows x64)" "eos-app-setup-$VERSION.exe"
-          upload_asset darwin-amd64 "EOS App (macOS Intel)" "eos-app_${VERNUM}_darwin-amd64.dmg"
-          upload_asset darwin-arm64 "EOS App (macOS Apple Silicon)" "eos-app_${VERNUM}_darwin-arm64.dmg"
-          upload_asset linux-amd64 "EOS App (Linux x64)" "eos-app_${VERNUM}_linux-amd64.tar.gz"
-          upload_asset linux-arm64 "EOS App (Linux ARM64)" "eos-app_${VERNUM}_linux-arm64.tar.gz"
+          upload_asset windows-amd64 "EOS Agent (Windows x64)" "eos-agent-setup-$VERSION.exe"
+          upload_asset darwin-amd64 "EOS Agent (macOS Intel)" "eos-agent_${VERNUM}_darwin-amd64.dmg"
+          upload_asset darwin-arm64 "EOS Agent (macOS Apple Silicon)" "eos-agent_${VERNUM}_darwin-arm64.dmg"
+          upload_asset linux-amd64 "EOS Agent (Linux x64)" "eos-agent_${VERNUM}_linux-amd64.tar.gz"
+          upload_asset linux-arm64 "EOS Agent (Linux ARM64)" "eos-agent_${VERNUM}_linux-arm64.tar.gz"
           echo "admin sync done: $VERNUM (quality=$QUALITY)"
 

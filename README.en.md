@@ -1,16 +1,16 @@
-# EOS App
+# EOS Agent
 
 [中文](./README.md) | [English](./README.en.md)
 
 **A desktop AI coding workspace.** Work with AI on local projects and inspect file changes, command output and task progress in one window.
 
-- Download: [Releases](https://github.com/eosaios/eos-app/releases) (always use the latest release)
-- Issues: [Issues](https://github.com/eosaios/eos-app/issues)
+- Download: [Releases](https://github.com/eosaios/eos-agent/releases) (always use the latest release)
+- Issues: [Issues](https://github.com/eosaios/eos-agent/issues)
 - Terminal edition: [EOS CLI](https://github.com/eosaios/eos)
 
-This repository is the **official distribution repo** for EOS App: installers, release notes, and product information — **not** the desktop source code. Core capabilities are built on the Rust core of [EOS CLI](https://github.com/eosaios/eos). Official packages include Core integrity checks (SHA-256 and Ed25519 verification). Core verification is separate from operating-system signing of the application package, which depends on the particular release.
+This repository is the **official distribution repo** for EOS Agent: installers, release notes, and product information — **not** the desktop source code. Core capabilities are built on the Rust core of [EOS CLI](https://github.com/eosaios/eos). Official packages include Core integrity checks (SHA-256 and Ed25519 verification). Core verification is separate from operating-system signing of the application package, which depends on the particular release.
 
-## Why EOS App
+## Why EOS Agent
 
 Work on project conversations, inspect changes, run terminal commands and check pages through the available browser backend in one workspace.
 
@@ -39,7 +39,7 @@ Configure model connections and check connectivity; manage rules, memory and con
 
 **Extensions and automation**
 
-Skills, MCP connections, plugin marketplace, themes and compatible local / GitHub theme imports. Marketplace installation and online services may require sign-in and entitlement; LSP requires its language server. Scheduled automations run only while EOS App is running and stop when the app exits.
+Skills, MCP connections, plugin marketplace, themes and compatible local / GitHub theme imports. Marketplace installation and online services may require sign-in and entitlement; LSP requires its language server. Scheduled automations run only while EOS Agent is running and stop when the app exits.
 
 **Terminal and desktop**
 
@@ -53,7 +53,7 @@ Integrated terminal, system tray, single instance and desktop notifications. The
 | macOS | Intel / Apple Silicon | dmg drag-and-drop, or portable tar.gz |
 | Linux | amd64 / arm64 | tar.gz |
 
-1. Open [Releases](https://github.com/eosaios/eos-app/releases) and download the latest package for your platform
+1. Open [Releases](https://github.com/eosaios/eos-agent/releases) and download the latest package for your platform
 2. Verify with `SHA256SUMS.txt` on the same page if needed
 3. Check and download updates in-app, then initiate installation. Windows / macOS use their platform installer flows; Linux opens the download folder for manual extraction and replacement.
 
@@ -63,13 +63,13 @@ Integrated terminal, system tray, single instance and desktop notifications. The
 
 ### Demo video (about 80 seconds)
 
-[![EOS App demo: from one request to a working file](https://eosaios.com/assets/eos-promo-preview.gif)](https://eosaios.com/assets/eos-promo.mp4)
+[![EOS Agent demo: from one request to a working file](https://eosaios.com/assets/eos-promo-preview.gif)](https://eosaios.com/assets/eos-promo.mp4)
 
 Click the preview for the full walkthrough — conversation, task execution, and file generation.
 
-Example workspace on macOS; layout can differ by system and release:
+Workspace preview using demonstration data; layout can differ by system and release:
 
-![EOS App main workspace](docs/images/workspace-overview.png)
+![EOS Agent main workspace](docs/images/eos-agent-workspace-20261115.png)
 
 - Left: new chat, skills and apps, automation, plus tasks / worktree, usage / network / memory / help
 - Center: conversation and the main workflow
@@ -79,11 +79,11 @@ Example workspace on macOS; layout can differ by system and release:
 
 **Desktop source code is not public. Official binaries are free for personal and commercial work.** See [LICENSE](./LICENSE) for the full terms.
 
-This free-use grant also covers official, unmodified EOSAIOS binaries released previously. Older packages or historical snapshots may still contain earlier wording; see section 6.2 of the [current main-branch license](https://github.com/eosaios/eos-app/blob/main/LICENSE) for the current grant.
+This free-use grant also covers official, unmodified EOSAIOS binaries released previously. Older packages or historical snapshots may still contain earlier wording; see section 6.2 of the [current main-branch license](https://github.com/eosaios/eos-agent/blob/main/LICENSE) for the current grant.
 
 - Individuals and organizations may use official, unmodified binaries for internal work, commercial software development and paid client projects without a separate commercial-use license
 - Unmodified sharing of official packages and public docs is allowed with the license, copyright notices and official source retained
-- Free use does not grant desktop source rights or permission to repackage or sell EOS App itself
+- Free use does not grant desktop source rights or permission to repackage or sell EOS Agent itself
 - Model API credits are not included; your provider determines API charges and data policies
 - The standalone EOS CLI distribution and third-party components retain their own licenses
 
@@ -97,5 +97,5 @@ Model requests go to your configured endpoint and can include messages, file con
 
 ## Contact
 
-- Issues: https://github.com/eosaios/eos-app/issues
+- Issues: https://github.com/eosaios/eos-agent/issues
 - Partnerships / redistribution licensing: legal@eosaios.com

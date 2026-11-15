@@ -17,7 +17,7 @@ def main():
     parser.add_argument('--triple', required=True)
     args = parser.parse_args()
     run = json.loads(subprocess.check_output([
-        'gh', 'run', 'view', args.run_id, '-R', 'eosaios/eos-app',
+        'gh', 'run', 'view', args.run_id, '-R', 'eosaios/eos-agent',
         '--json', 'status,jobs,headSha,url',
     ], text=True))
     assert run['status'] == 'completed', 'Build must finish before recovering evidence'
@@ -34,7 +34,7 @@ def main():
     root = Path.cwd()
     version = args.version.removeprefix('v')
     suffix = '.zip' if args.platform.startswith('windows-') else '.tar.gz'
-    archive = root / 'dist' / f'eos-app_{version}_{args.platform}{suffix}'
+    archive = root / 'dist' / f'eos-agent_{version}_{args.platform}{suffix}'
     # The immutable archive came from this repository's checked build workflow.
     # Reject path traversal before unpacking the stage used by the recorder.
     if suffix == '.zip':

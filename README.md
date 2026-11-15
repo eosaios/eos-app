@@ -1,16 +1,16 @@
-# EOS App
+# EOS Agent
 
 [中文](./README.md) | [English](./README.en.md)
 
 **桌面端 AI 编程工作台。** 在同一个窗口与 AI 协作处理本地项目，并检查文件改动、命令输出和任务进度。
 
-- 下载安装包：[Releases](https://github.com/eosaios/eos-app/releases)（始终以最新 Release 为准）
-- 问题反馈：[Issues](https://github.com/eosaios/eos-app/issues)
+- 下载安装包：[Releases](https://github.com/eosaios/eos-agent/releases)（始终以最新 Release 为准）
+- 问题反馈：[Issues](https://github.com/eosaios/eos-agent/issues)
 - 终端版：[EOS CLI](https://github.com/eosaios/eos)
 
-本仓库是 EOS App 的**官方发行仓**：提供安装包、版本说明与产品介绍，**不包含桌面端源码**。核心能力基于 [EOS CLI](https://github.com/eosaios/eos) 的 Rust 内核，官方发行包附带 Core 完整性校验（SHA-256 与 Ed25519 验签）。Core 校验与操作系统对安装包的签名验证是不同机制，后者以具体发行包为准。
+本仓库是 EOS Agent 的**官方发行仓**：提供安装包、版本说明与产品介绍，**不包含桌面端源码**。核心能力基于 [EOS CLI](https://github.com/eosaios/eos) 的 Rust 内核，官方发行包附带 Core 完整性校验（SHA-256 与 Ed25519 验签）。Core 校验与操作系统对安装包的签名验证是不同机制，后者以具体发行包为准。
 
-## 为什么是 EOS App
+## 为什么是 EOS Agent
 
 在同一个工作台中处理项目对话、查看改动、运行终端命令，并使用可用的浏览器后端检查页面。
 
@@ -39,7 +39,7 @@ macOS / Windows 有原生内嵌浏览器宿主；Linux 默认使用独立浏览�
 
 **扩展与自动化**
 
-技能、MCP 连接、插件市场、主题及符合规范的本地 / GitHub 皮肤导入。市场安装与在线服务可能要求登录和相应权益；LSP 需要对应语言服务器。定时自动化仅在 EOS App 运行时调度，退出应用后不会继续执行。
+技能、MCP 连接、插件市场、主题及符合规范的本地 / GitHub 皮肤导入。市场安装与在线服务可能要求登录和相应权益；LSP 需要对应语言服务器。定时自动化仅在 EOS Agent 运行时调度，退出应用后不会继续执行。
 
 **终端与桌面**
 
@@ -53,7 +53,7 @@ macOS / Windows 有原生内嵌浏览器宿主；Linux 默认使用独立浏览�
 | macOS | Intel / Apple Silicon | dmg 拖拽安装，或便携 tar.gz |
 | Linux | amd64 / arm64 | tar.gz |
 
-1. 打开 [Releases](https://github.com/eosaios/eos-app/releases)，下载对应平台的最新安装包
+1. 打开 [Releases](https://github.com/eosaios/eos-agent/releases)，下载对应平台的最新安装包
 2. 需要时用同页的 `SHA256SUMS.txt` 校验
 3. 安装后可在应用内检查并下载更新，由用户发起安装。Windows / macOS 使用各自安装流程；Linux 打开下载目录后需自行解压替换。
 
@@ -63,13 +63,13 @@ macOS / Windows 有原生内嵌浏览器宿主；Linux 默认使用独立浏览�
 
 ### 演示视频（约 80 秒）
 
-[![EOS App 演示视频：从一句需求到可用的项目文件](https://eosaios.com/assets/eos-promo-preview.gif)](https://eosaios.com/assets/eos-promo.mp4)
+[![EOS Agent 演示视频：从一句需求到可用的项目文件](https://eosaios.com/assets/eos-promo-preview.gif)](https://eosaios.com/assets/eos-promo.mp4)
 
 点击预览观看完整演示——对话协作、任务执行与文件生成。
 
-以下为 macOS 示例界面；其他系统及发行版本的布局可能不同：
+以下界面使用演示数据；其他系统及发行版本的布局可能不同：
 
-![EOS App 主工作台](docs/images/workspace-overview.png)
+![EOS Agent 主工作台](docs/images/eos-agent-workspace-20261115.png)
 
 - 左侧：新对话、技能和应用、自动化，以及任务 / 工作树、用量 / 网络 / 记忆 / 帮助
 - 中央：对话与主工作流
@@ -79,11 +79,11 @@ macOS / Windows 有原生内嵌浏览器宿主；Linux 默认使用独立浏览�
 
 **桌面端源码不公开，官方二进制包可免费用于个人与商业工作。** 具体授权见 [LICENSE](./LICENSE)。
 
-这份免费使用授权也适用于此前由 EOSAIOS 发布的官方未修改二进制包。旧安装包随附文件或历史版本快照可能仍保留先前条款，当前授权以[主分支许可证](https://github.com/eosaios/eos-app/blob/main/LICENSE)第六条第 2 项为准。
+这份免费使用授权也适用于此前由 EOSAIOS 发布的官方未修改二进制包。旧安装包随附文件或历史版本快照可能仍保留先前条款，当前授权以[主分支许可证](https://github.com/eosaios/eos-agent/blob/main/LICENSE)第六条第 2 项为准。
 
 - 个人与组织均可免费下载安装、运行官方未修改安装包，用于企业内部工作、商业软件开发和收费客户项目，无需单独申请商业使用授权
 - 原样分享官方安装包与公开文档时，请保留许可证、版权声明与官方来源
-- 免费使用不授予桌面端源码权利，也不授权重新打包或销售 EOS App 软件本身
+- 免费使用不授予桌面端源码权利，也不授权重新打包或销售 EOS Agent 软件本身
 - 软件免费不包含模型 API 额度；自带 API Key 的费用与数据政策由所选服务商决定
 - EOS CLI 独立发行版本遵循其自身许可证，本授权不改变第三方组件的许可证
 
@@ -97,5 +97,5 @@ macOS / Windows 有原生内嵌浏览器宿主；Linux 默认使用独立浏览�
 
 ## 联系
 
-- 问题反馈：https://github.com/eosaios/eos-app/issues
+- 问题反馈：https://github.com/eosaios/eos-agent/issues
 - 合作 / 再分发授权咨询：legal@eosaios.com

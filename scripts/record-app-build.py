@@ -33,19 +33,19 @@ def record(args):
     root = Path.cwd()
     version = args.version.removeprefix('v')
     channel = args.channel
-    names = {'stable': 'EOS', 'beta': 'EOS Beta', 'dev': 'EOS Dev'}
+    names = {'stable': 'EOS Agent', 'beta': 'EOS Agent Beta', 'dev': 'EOS Agent Dev'}
     bundle_id = 'com.eosaios.eos-app' + ('' if channel == 'stable' else '.' + channel)
-    stage = root / 'dist' / f'eos-app_{version}_{args.platform}'
+    stage = root / 'dist' / f'eos-agent_{version}_{args.platform}'
     if args.platform.startswith('darwin-'):
         bundle = stage / (names[channel] + '.app')
         info = plistlib.loads((bundle / 'Contents/Info.plist').read_bytes())
         assert (info['CFBundleIdentifier'], info['CFBundleShortVersionString']) == (bundle_id, version)
         scheme = 'eosagent' + ('' if channel == 'stable' else '-' + channel)
         assert info['CFBundleURLTypes'][0]['CFBundleURLSchemes'] == [scheme]
-        binary = bundle / 'Contents/MacOS/eos-app'
+        binary = bundle / 'Contents/MacOS/eos-agent'
         core_dir = bundle / 'Contents/Resources/core' / args.triple
     else:
-        binary = stage / ('eos-app.exe' if args.platform.startswith('windows-') else 'eos-app')
+        binary = stage / ('eos-agent.exe' if args.platform.startswith('windows-') else 'eos-agent')
         core_dir = stage / 'core' / args.triple
     manifest = json.loads((core_dir / 'manifest.json').read_text())
     core_sha = sha(core_dir / manifest['binary'])
@@ -99,6 +99,7 @@ def record(args):
         'core_source': revision(root.parent / 'eos-core-rs'),
         'distribution_source': revision(root.parent / 'release-tools'),
         'workflow_run_id': os.environ['GITHUB_RUN_ID'],
+        'core_build_workflow_run_id': os.environ.get('EOS_REUSED_CORE_RUN_ID') or os.environ['GITHUB_RUN_ID'],
         'build_workflow_run_id': os.environ.get('EOS_REUSED_BUILD_RUN_ID', os.environ['GITHUB_RUN_ID']),
         'expected_catalog_sha256': expected_catalog_sha,
         'bundle_id': bundle_id, 'app_binary_sha256': sha(binary),
