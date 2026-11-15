@@ -1,5 +1,8 @@
 name: Synchronize verified EOS Agent release
 on:
+  push:
+    branches: [codex/agent-stable-brand-20261115]
+    paths: [.github/workflows/sync-agent-release.yml]
   workflow_dispatch:
     inputs:
       operation:
@@ -32,7 +35,7 @@ jobs:
         env:
           EOS_ADMIN_EMAIL: ${{ secrets.EOS_ADMIN_EMAIL }}
           EOS_ADMIN_PASSWORD: ${{ secrets.EOS_ADMIN_PASSWORD }}
-          OPERATION: ${{ inputs.operation }}
-          VERSION: ${{ inputs.version }}
+          OPERATION: ${{ inputs.operation || 'preflight' }}
+          VERSION: ${{ inputs.version || 'v1.0.19' }}
           LOCK_SHA256: ${{ inputs.lock_sha256 }}
         run: python3 scripts/sync-agent-release.py --operation "$OPERATION" --version "$VERSION" --lock-sha256 "$LOCK_SHA256" --notes release-notes.md

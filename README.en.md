@@ -67,7 +67,7 @@ Integrated terminal, system tray, single instance and desktop notifications. The
 
 Click the preview for the full walkthrough — conversation, task execution, and file generation.
 
-Example workspace on macOS; layout can differ by system and release:
+Workspace preview using demonstration data; layout can differ by system and release:
 
 ![EOS Agent main workspace](docs/images/eos-agent-workspace-20261115.png)
 

@@ -2,6 +2,8 @@ import importlib.util
 import json
 from pathlib import Path
 import tempfile
+from unittest.mock import patch
+import io
 import unittest
 
 spec=importlib.util.spec_from_file_location('sync',Path(__file__).with_name('sync-agent-release.py'))
@@ -45,5 +47,38 @@ class ReleaseValidation(unittest.TestCase):
         sync.check_version(row,expected)
         for key,value in [('commit','c'*40),('sha256_hash','d'*64),('quality','beta'),('is_deprecated',True),('is_active',False)]:
             with self.subTest(key=key), self.assertRaises(ValueError):sync.check_version({**row,key:value},expected)
+
+    def test_preflight_authenticates_and_reads_without_release_writes(self):
+        apps=[{'id':index+1,'app_key':'eos-app','release_channel':'stable','platform':platform,'display_name':'EOS Agent'} for index,platform in enumerate(sync.PLATFORMS)]
+        with patch.dict(sync.os.environ,{'EOS_ADMIN_EMAIL':'fixture','EOS_ADMIN_PASSWORD':'fixture'}), patch.object(sync,'request',side_effect=[{'access_token':'fixture-token'},{'applications':apps},{'packages':[]}]) as request, patch.object(sync.sys,'argv',['sync','--operation','preflight','--version','v1.0.19']), patch('sys.stdout',new_callable=io.StringIO) as output:
+            sync.main()
+            self.assertEqual(request.call_count,3)
+            self.assertTrue(all(call.kwargs.get('method') is None for call in request.call_args_list))
+            self.assertNotIn('fixture-token',output.getvalue())
+            self.assertFalse(json.loads(output.getvalue())['production_writes'])
+
+    def test_failed_promotion_restores_only_already_changed_platforms(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);lock,digest=self.fixture(root);notes=root/'notes.md';notes.write_text('Fixture release')
+            apps=[{'id':index+1,'app_key':'eos-app','release_channel':'stable','platform':platform,'display_name':'EOS Agent'} for index,platform in enumerate(sync.PLATFORMS)]
+            statuses=[]
+            def request(path,token='',payload=None,method=None):
+                if path.endswith('/auth/login'):return {'access_token':'fixture-token'}
+                if '/applications?' in path:return {'applications':apps}
+                if path.endswith('/download/packages'):return {'packages':[]}
+                if '/versions?application_id=' in path:
+                    app=apps[int(path.rsplit('=',1)[1])-1]
+                    item=next(item for item in lock['files'].values() if item['platform']==app['platform'] and item['kind']=='installer')
+                    row={'id':100+app['id'],'application_id':app['id'],'platform':app['platform'],'product_version':'1.0.19','commit':'a'*40,'file_size':item['size'],'sha256_hash':item['sha256'],'is_active':True,'is_deprecated':False,'quality':'stable','is_current':False}
+                    return [{**row,'id':app['id']*10,'product_version':'1.0.18','is_current':True},row]
+                if path.endswith('/versions/status'):
+                    statuses.append(payload['version_id'])
+                    if payload['version_id']==102:raise RuntimeError('fixture promotion failure')
+                    return {'success':True}
+                self.fail('Unexpected mutation '+path)
+            args=['sync','--operation','sync','--version','v1.0.19','--root',str(root),'--notes',str(notes),'--lock-sha256',digest]
+            with patch.dict(sync.os.environ,{'EOS_ADMIN_EMAIL':'fixture','EOS_ADMIN_PASSWORD':'fixture'}),patch.object(sync,'request',side_effect=request),patch.object(sync,'verify_download'),patch.object(sync.sys,'argv',args):
+                with self.assertRaisesRegex(RuntimeError,'fixture promotion failure'):sync.main()
+            self.assertEqual(statuses,[101,102,10])
 
 if __name__=='__main__':unittest.main()
