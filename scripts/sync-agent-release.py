@@ -107,7 +107,10 @@ def verify_download(row, filename):
     tail = url.path[len(prefix):].split('/')
     if tail[-1] != filename or len(tail) not in (1, 2) or len(tail) == 2 and not re.fullmatch('[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}', tail[0]):
         raise ValueError('Unapproved artifact download filename')
-    with CLIENT.open(row['file_url'], timeout=300) as response:
+    # Match the installed updater's wire contract; the public CDN rejects the
+    # default Python client while serving this same URL to EOS and browsers.
+    download = urllib.request.Request(row['file_url'], headers={'User-Agent': 'EOS-App-Update'})
+    with CLIENT.open(download, timeout=300) as response:
         value = hashlib.sha256(); size = 0
         while chunk := response.read(1024 * 1024):
             value.update(chunk); size += len(chunk)
