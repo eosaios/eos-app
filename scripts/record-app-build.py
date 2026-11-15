@@ -29,6 +29,18 @@ def verified_live_catalog(root, platform):
     return live_gate, sha(expected_snapshot)
 
 
+def verified_composer_input(root, platform):
+    gate = json.loads((root / 'dist' / f'composer-input-{platform}.json').read_text())
+    assert gate['passed'] and gate['unknown_limit_explicit']
+    assert gate['oversized_turn_rejected_before_persistence'] and gate['no_cloud_requests']
+    assert gate['oversized_polish_rejected_before_inference']
+    assert gate['inference_requests'] == 0
+    assert gate['exact_boundary']['estimated_tokens'] == gate['exact_boundary']['max_input_tokens'] == 8
+    assert gate['selected_larger_model']['estimated_tokens'] == 8
+    assert gate['selected_larger_model']['max_input_tokens'] == 256
+    return gate
+
+
 def record(args):
     root = Path.cwd()
     version = args.version.removeprefix('v')
@@ -84,6 +96,7 @@ def record(args):
     for request in dynamic_gate['requests']:
         assert len(list(image_blocks(request['body']))) == int(request['actual_image_bytes_sent'])
     live_gate, expected_catalog_sha = verified_live_catalog(root, args.platform)
+    composer_input_gate = verified_composer_input(root, args.platform)
     app_source = revision(root)
     identity = (root / 'dist' / f'build-identity-{args.platform}.txt').read_text()
     assert 'vcs.revision=' + app_source['commit'] in identity
@@ -109,6 +122,7 @@ def record(args):
         'native_upgrade_gate': gate, 'native_proxy_gate': proxy_gate,
         'native_capability_gate': capability_gate, 'native_dynamic_capability_gate': dynamic_gate,
         'native_live_catalog_gate': live_gate, 'files': files,
+        'native_composer_input_gate': composer_input_gate,
     }
     (root / 'dist' / f'provenance-{args.platform}.json').write_text(json.dumps(result, indent=2) + '\n')
     print(json.dumps(result))

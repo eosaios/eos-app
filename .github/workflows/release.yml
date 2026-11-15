@@ -178,6 +178,16 @@ jobs:
         working-directory: eos-core-rs
         run: cargo build --release --target ${{ matrix.triple }} -p eos-core-bin
 
+      - name: Test model input budget and protocol
+        if: matrix.goos == 'linux' && matrix.goarch == 'amd64' && inputs.reuse_core_run_id == ''
+        working-directory: eos-core-rs
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --release --target ${{ matrix.triple }} -p eos-core-runtime --test composer_input_guard
+          cargo test --release --target ${{ matrix.triple }} -p eos-core-app-server --lib model_input
+          cargo test --release --target ${{ matrix.triple }} -p eos-core-protocol --lib
+
       - name: Sign and package sidecar
         if: inputs.reuse_core_run_id == ''
         shell: pwsh
@@ -384,6 +394,23 @@ jobs:
           --triple "${{ matrix.triple }}"
           --version "${{ inputs.version }}"
           --channel "${{ inputs.channel || 'stable' }}"
+
+      - name: Test composer frontend
+        if: matrix.goos == 'linux' && matrix.goarch == 'amd64'
+        working-directory: app/frontend
+        run: npm test
+
+      - name: Verify packaged text input budget
+        shell: bash
+        working-directory: app
+        run: |
+          set -euo pipefail
+          python3 ../release-tools/scripts/verify-composer-input.py \
+            --platform "${{ matrix.goos }}-${{ matrix.goarch }}" \
+            --triple "${{ matrix.triple }}" \
+            --version "${{ inputs.version }}" \
+            --channel "${{ inputs.channel || 'stable' }}"
+          go test ./internal/app -run '^TestComposerInputBudgetForwardsCanonicalTextAndCoreErrors$' -count=1
 
       - name: Record packaged provenance
         shell: bash
