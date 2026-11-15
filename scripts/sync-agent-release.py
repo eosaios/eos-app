@@ -83,6 +83,16 @@ def stable_apps(apps):
     return selected
 
 
+def brand_targets(family):
+    return [app for app in family if app['app_key'] in ('eos-app', 'eos-app-dev')
+            and app['release_channel'] in ('stable', 'beta', 'dev') and app['platform'] in PLATFORMS]
+
+
+def brand_name(app):
+    suffix = {'stable': '', 'beta': ' Beta', 'dev': ' Dev'}[app['release_channel']]
+    return 'EOS Agent' + suffix + ' (' + PLATFORMS[app['platform']] + ')'
+
+
 def check_version(row, expected):
     fields = ('application_id', 'platform', 'product_version', 'commit', 'file_size', 'sha256_hash')
     if any(row[field] != expected[field] for field in fields) or not row['is_active'] or row['is_deprecated'] or row['quality'] != 'stable':
@@ -187,9 +197,12 @@ def main():
         for platform in reversed(promoted):
             request(PREFIX + '/versions/status', token, {'version_id': previous[platform], 'is_current': True}, 'PUT')
         raise
-    for platform, app in apps.items():
+    for app in brand_targets(family):
         request(PREFIX + '/applications/' + str(app['id']), token,
-                {'display_name': 'EOS Agent (' + PLATFORMS[platform] + ')', 'description': 'EOS Agent 桌面端'}, 'PUT')
+                {'display_name': brand_name(app), 'description': 'EOS Agent 桌面端'}, 'PUT')
+    renamed = request(PREFIX + '/applications?keyword=eos-app&page_size=100', token)['applications']
+    if any(app['display_name'] != brand_name(app) for app in brand_targets(renamed)):
+        raise ValueError('Product display metadata was not fully renamed')
     print(json.dumps({'version': version, 'platforms': list(targets), 'verified_downloads': True, 'unrelated_products_unchanged': True}))
 
 

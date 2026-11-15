@@ -41,6 +41,14 @@ class ReleaseValidation(unittest.TestCase):
         for invalid in [apps[:-1],apps+[apps[0]]]:
             with self.assertRaises(ValueError):sync.stable_apps(invalid)
 
+    def test_brand_metadata_preserves_channel_and_excludes_other_products(self):
+        base={'id':1,'app_key':'eos-app','platform':'darwin-arm64','release_channel':'stable'}
+        beta={**base,'id':2,'release_channel':'beta'}
+        dev={**base,'id':3,'release_channel':'dev','app_key':'eos-app-dev'}
+        other={**base,'id':4,'app_key':'eos-todo'}
+        self.assertEqual(sync.brand_targets([base,beta,dev,other]),[base,beta,dev])
+        self.assertIn('EOS Agent Beta',sync.brand_name(beta));self.assertIn('EOS Agent Dev',sync.brand_name(dev))
+
     def test_existing_version_must_match_every_frozen_field(self):
         expected={'application_id':1,'platform':'darwin-arm64','product_version':'1.0.19','commit':'a'*40,'file_size':123,'sha256_hash':'b'*64}
         row={**expected,'quality':'stable','is_active':True,'is_deprecated':False}

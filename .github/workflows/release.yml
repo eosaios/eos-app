@@ -122,7 +122,8 @@ jobs:
 
       - uses: actions/setup-go@v6
         with:
-          go-version: "1.25"
+          go-version-file: app/go.mod
+          cache-dependency-path: app/go.sum
 
       - uses: actions/setup-node@v5
         with:
@@ -188,6 +189,15 @@ jobs:
           actual_hash=$(sha256sum "$bin_file" | awk '{print $1}')
           echo "manifest=$manifest_hash binary=$actual_hash"
           [ "$manifest_hash" = "$actual_hash" ] || { echo "::error::sha256 不一致"; exit 1; }
+
+      - name: Preserve verified sidecar for candidate recovery
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: |
+            eos-core-rs/pkg/coreapi/sidecar/core/${{ matrix.triple }}/eos-core*
+            eos-core-rs/pkg/coreapi/sidecar/core/${{ matrix.triple }}/manifest.json
+          if-no-files-found: error
 
       - name: Stage sidecar into app core dir
         shell: bash   # Windows runner 默认 shell 是 pwsh，bash 语法必须显式声明
