@@ -16,6 +16,7 @@ class ComposerInputGateTest(unittest.TestCase):
             (root / 'dist').mkdir()
             path = root / 'dist/composer-input-linux-amd64.json'
             gate = {'passed': True, 'unknown_limit_explicit': True,
+                    'oversized_polish_rejected_before_inference': True,
                     'oversized_turn_rejected_before_persistence': True, 'no_cloud_requests': True,
                     'inference_requests': 0,
                     'exact_boundary': {'estimated_tokens': 8, 'max_input_tokens': 8},
@@ -23,6 +24,7 @@ class ComposerInputGateTest(unittest.TestCase):
             path.write_text(json.dumps(gate))
             self.assertEqual(recorder.verified_composer_input(root, 'linux-amd64'), gate)
             for bad in [{'oversized_turn_rejected_before_persistence': False}, {'inference_requests': 1},
+                        {'oversized_polish_rejected_before_inference': False},
                         {'exact_boundary': {'estimated_tokens': 8, 'max_input_tokens': 80}},
                         {'unknown_limit_explicit': False}]:
                 with self.subTest(bad=bad):

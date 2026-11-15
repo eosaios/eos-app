@@ -33,6 +33,7 @@ def verified_composer_input(root, platform):
     gate = json.loads((root / 'dist' / f'composer-input-{platform}.json').read_text())
     assert gate['passed'] and gate['unknown_limit_explicit']
     assert gate['oversized_turn_rejected_before_persistence'] and gate['no_cloud_requests']
+    assert gate['oversized_polish_rejected_before_inference']
     assert gate['inference_requests'] == 0
     assert gate['exact_boundary']['estimated_tokens'] == gate['exact_boundary']['max_input_tokens'] == 8
     assert gate['selected_larger_model']['estimated_tokens'] == 8

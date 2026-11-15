@@ -184,7 +184,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cargo test --release --target ${{ matrix.triple }} -p eos-core-runtime --lib model_input
+          cargo test --release --target ${{ matrix.triple }} -p eos-core-runtime --test composer_input_guard
           cargo test --release --target ${{ matrix.triple }} -p eos-core-app-server --lib model_input
           cargo test --release --target ${{ matrix.triple }} -p eos-core-protocol --lib
 

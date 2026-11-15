@@ -89,12 +89,19 @@ def verify(core, directory):
             assert '输入内容超过所选模型上限' in str(error), str(error)
         else:
             raise AssertionError('Oversized turn was accepted')
+        try:
+            rpc.call('insight/refine_input', {'draft': 'hello ' * 30})
+        except AssertionError as error:
+            assert '输入内容超过所选模型上限' in str(error), str(error)
+        else:
+            raise AssertionError('Oversized AI polish input was accepted')
         assert rpc.call('session/messages/load', {'session_id': session['id']}) == []
         assert posts == [], posts
         return {'passed': True, 'exact_boundary': exact, 'selected_larger_model': large,
                 'unknown_limit_explicit': unknown['max_input_tokens'] is None,
                 'unicode_estimated_tokens': unicode['estimated_tokens'],
                 'oversized_turn_rejected_before_persistence': True, 'inference_requests': len(posts),
+                'oversized_polish_rejected_before_inference': True,
                 'no_cloud_requests': True}
     finally:
         rpc.close()
