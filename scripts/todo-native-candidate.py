@@ -16,7 +16,6 @@ import sys
 import tarfile
 import time
 import traceback
-import urllib.request
 import urllib.parse
 
 from cryptography.fernet import Fernet
@@ -208,8 +207,8 @@ class Candidate:
         if parsed.scheme != 'https' or parsed.netloc != 'dl.eosaios.com' or not re.fullmatch(r'[0-9a-f]{64}', baseline['sha256']):
             raise ValueError('invalid frozen upgrade baseline')
         package = self.root / ('baseline.exe' if os.name == 'nt' else 'baseline.tar.gz')
-        with urllib.request.urlopen(baseline['url'], timeout=120) as source, package.open('wb') as destination:
-            shutil.copyfileobj(source, destination)
+        self.run(['curl', '--fail', '--location', '--silent', '--show-error', '--max-time', '120',
+                  '--output', package, baseline['url']])
         if digest(package) != baseline['sha256']:
             raise ValueError('upgrade baseline digest differs')
         if os.name == 'nt':
