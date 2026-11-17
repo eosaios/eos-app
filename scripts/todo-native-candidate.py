@@ -114,6 +114,13 @@ class Candidate:
     def build(self):
         self.stage = 'native prerequisites'
         base, pro, core = [self.paths[name] for name in ['base', 'pro', 'core']]
+        if self.platform == 'linux-amd64':
+            # Real desktop services keep notification and folder-opening smoke
+            # checks native without depending on a browser's window lifetime.
+            self.desktop_services = [subprocess.Popen(args, env=self.env, stdout=self.log, stderr=subprocess.STDOUT)
+                                     for args in [['dunst'], ['thunar', '--daemon']]]
+            self.run(['gdbus', 'wait', '--session', '--timeout', '30', 'org.xfce.Thunar'])
+            self.run(['xdg-mime', 'default', 'thunar.desktop', 'inode/directory'])
         target = 'x86_64-pc-windows-gnu' if self.platform == 'windows-amd64' else 'x86_64-unknown-linux-gnu'
         self.run(['rustup', 'target', 'add', target])
         self.run(['go', 'install', 'github.com/wailsapp/wails/v3/cmd/wails3@v3.1.0'])

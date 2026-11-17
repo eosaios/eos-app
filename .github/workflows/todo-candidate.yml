@@ -46,7 +46,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev pkg-config libpipewire-0.3-dev libdrm-dev libgbm-dev libwayland-dev libxdo-dev libx11-dev libx11-xcb-dev libxtst-dev libxkbcommon-dev libxkbcommon-x11-dev xdg-utils desktop-file-utils xvfb xauth
+          sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev pkg-config libpipewire-0.3-dev libdrm-dev libgbm-dev libwayland-dev libxdo-dev libx11-dev libx11-xcb-dev libxtst-dev libxkbcommon-dev libxkbcommon-x11-dev xdg-utils desktop-file-utils xvfb xauth dbus-x11 libnotify-bin dunst thunar
       - name: Install native Windows prerequisites
         if: runner.os == 'Windows'
         shell: pwsh
@@ -65,7 +65,7 @@ jobs:
           PRIVATE_SOURCE_TOKEN: ${{ secrets.EOS_CORE_PAT }}
         run: |
           if [[ "$RUNNER_OS" == "Linux" ]]; then
-            xvfb-run -a python scripts/todo-native-candidate.py
+            xvfb-run -a dbus-run-session -- python scripts/todo-native-candidate.py
           else
             python scripts/todo-native-candidate.py
           fi
