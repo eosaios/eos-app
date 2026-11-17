@@ -1,0 +1,95 @@
+import importlib.util
+import json
+import contextlib
+import io
+import os
+import pathlib
+import tempfile
+import unittest
+from unittest.mock import patch
+
+from cryptography.fernet import Fernet
+
+spec = importlib.util.spec_from_file_location('candidate', pathlib.Path(__file__).with_name('todo-native-candidate.py'))
+candidate = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(candidate)
+
+
+class PrivacyGuards(unittest.TestCase):
+    def config(self):
+        return dict(version='1.4.9', diagnostics_key=Fernet.generate_key().decode(),
+                    **{name: dict(repository='example/private-' + name, commit='a' * 40, directory='component-' + name)
+                       for name in ['base', 'pro', 'core']})
+
+    def test_rejects_moving_refs_traversal_and_version_mismatch(self):
+        for key, value in [('commit', 'main'), ('directory', '../source'), ('repository', 'https://untrusted/source')]:
+            config = self.config()
+            config['base'][key] = value
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                candidate.validate_config(config, '1.4.9')
+        with self.assertRaises(ValueError):
+            candidate.validate_config(self.config(), '1.4.10')
+
+    def test_child_process_environment_excludes_credentials_and_configuration(self):
+        with tempfile.TemporaryDirectory() as directory, open(os.devnull, 'wb') as log, patch.dict(os.environ, {
+                'PRIVATE_BUILD_CONFIG': 'private coordinates', 'PRIVATE_SOURCE_TOKEN': 'credential',
+                'GH_TOKEN': 'another credential', 'GITHUB_TOKEN': 'runner credential'}):
+            build = candidate.Candidate(self.config(), 'linux-amd64', '1.4.9', pathlib.Path(directory), log)
+            self.assertEqual({key: build.env.get(key) for key in ['PRIVATE_BUILD_CONFIG', 'PRIVATE_SOURCE_TOKEN', 'GH_TOKEN', 'GITHUB_TOKEN']},
+                             dict(PRIVATE_BUILD_CONFIG=None, PRIVATE_SOURCE_TOKEN=None, GH_TOKEN=None, GITHUB_TOKEN=None))
+
+    def fixture(self, root):
+        filename = 'eos-todo_1.4.9_linux-amd64.tar.gz'
+        (root / filename).write_bytes(b'synthetic package')
+        manifest = dict(channel='stable', environment='production', runtime_verified=True, distribution_ready=True,
+                        file=filename, file_size=17, sha256=candidate.digest(root / filename),
+                        api_origin='https://api.eosaios.com', **{name: dict(commit='a' * 40, dirty=False) for name in ['base', 'pro', 'core_source']})
+        path = root / 'release-manifest.json'
+        path.write_text(json.dumps(manifest))
+        return path, manifest
+
+    def test_export_copies_only_installer_identity_and_checksum(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory); output = root / 'out'; output.mkdir()
+            path, manifest = self.fixture(root)
+            (root / 'source.go').write_text('private source')
+            (root / 'build.log').write_text('private diagnostic')
+            self.assertEqual(candidate.export_manifest(path, output), manifest)
+            self.assertEqual(sorted(p.name for p in output.iterdir()), ['SHA256SUMS.txt', manifest['file'], 'release-manifest.json'])
+            self.assertEqual((output / manifest['file']).read_bytes(), b'synthetic package')
+
+    def test_export_rejects_paths_secrets_and_changed_package(self):
+        for field, value in [('file', '../private.txt'), ('debug', '/home/runner/private/source.go'),
+                             ('repository', 'https://github.com/example/private'), ('token', 'credential')]:
+            with tempfile.TemporaryDirectory() as directory:
+                root = pathlib.Path(directory); output = root / 'out'; output.mkdir()
+                path, manifest = self.fixture(root); manifest[field] = value; path.write_text(json.dumps(manifest))
+                with self.subTest(field=field), self.assertRaises(ValueError):
+                    candidate.export_manifest(path, output)
+                self.assertEqual(list(output.iterdir()), [])
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory); output = root / 'out'; output.mkdir()
+            path, manifest = self.fixture(root); (root / manifest['file']).write_bytes(b'tampered')
+            with self.assertRaises(ValueError):
+                candidate.export_manifest(path, output)
+
+    def test_failed_build_seals_details_without_printing_them(self):
+        private = 'private source diagnostic and confidential identifier'
+        config = self.config()
+        with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {
+                'RUNNER_TEMP': directory, 'PRIVATE_BUILD_CONFIG': json.dumps(config), 'PRIVATE_SOURCE_TOKEN': 'credential',
+                'CANDIDATE_VERSION': '1.4.9', 'CANDIDATE_PLATFORM': 'linux-amd64'}), \
+                patch.object(candidate.Candidate, 'checkout'), patch.object(candidate.Candidate, 'build', side_effect=ValueError(private)):
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                self.assertEqual(candidate.main(), 1)
+            self.assertNotIn(private, output.getvalue())
+            exported = pathlib.Path(directory) / 'todo-export'
+            self.assertEqual([p.name for p in exported.iterdir()], ['diagnostics.fernet'])
+            sealed = (exported / 'diagnostics.fernet').read_bytes()
+            self.assertNotIn(private.encode(), sealed)
+            self.assertIn(private.encode(), Fernet(config['diagnostics_key'].encode()).decrypt(sealed))
+
+
+if __name__ == '__main__':
+    unittest.main()

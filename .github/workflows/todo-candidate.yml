@@ -1,0 +1,72 @@
+name: Todo native candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Stable candidate version
+        required: true
+      target:
+        type: choice
+        options: [all, windows-amd64, linux-amd64]
+        default: all
+
+permissions:
+  contents: read
+
+jobs:
+  native:
+    name: Todo (${{ matrix.platform }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 65
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(inputs.target == 'windows-amd64' && '[{"platform":"windows-amd64","runner":"windows-latest"}]' || inputs.target == 'linux-amd64' && '[{"platform":"linux-amd64","runner":"ubuntu-24.04"}]' || '[{"platform":"windows-amd64","runner":"windows-latest"},{"platform":"linux-amd64","runner":"ubuntu-24.04"}]') }}
+    env:
+      PYTHONUTF8: '1'
+      CARGO_TERM_COLOR: never
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.26.x'
+          cache: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - name: Install diagnostic encryption
+        run: python -m pip install cryptography==46.0.3
+      - name: Install native Linux prerequisites
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev pkg-config libpipewire-0.3-dev libdrm-dev libgbm-dev libwayland-dev libxdo-dev libx11-dev libx11-xcb-dev libxtst-dev libxkbcommon-dev libxkbcommon-x11-dev xdg-utils desktop-file-utils xvfb xauth
+      - name: Install native Windows prerequisites
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install nsis mingw --no-progress -y
+          'C:\Program Files (x86)\NSIS' >> $env:GITHUB_PATH
+          'C:\ProgramData\mingw64\mingw64\bin' >> $env:GITHUB_PATH
+          'C:\msys64\mingw64\bin' >> $env:GITHUB_PATH
+      - name: Build and verify isolated candidate
+        env:
+          CANDIDATE_VERSION: ${{ inputs.version }}
+          CANDIDATE_PLATFORM: ${{ matrix.platform }}
+          PRIVATE_BUILD_CONFIG: ${{ secrets.EOS_TODO_BUILD_CONFIG }}
+          PRIVATE_SOURCE_TOKEN: ${{ secrets.EOS_CORE_PAT }}
+        run: python scripts/todo-native-candidate.py
+      - name: Export candidate allowlist and sealed diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: todo-candidate-${{ matrix.platform }}
+          path: ${{ runner.temp }}/todo-export/*
+          retention-days: 7
+          if-no-files-found: warn
