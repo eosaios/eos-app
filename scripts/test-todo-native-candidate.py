@@ -6,6 +6,7 @@ import os
 import pathlib
 import tempfile
 import unittest
+import subprocess
 from unittest.mock import patch
 
 from cryptography.fernet import Fernet
@@ -89,6 +90,25 @@ class PrivacyGuards(unittest.TestCase):
             sealed = (exported / 'diagnostics.fernet').read_bytes()
             self.assertNotIn(private.encode(), sealed)
             self.assertIn(private.encode(), Fernet(config['diagnostics_key'].encode()).decrypt(sealed))
+
+    def test_native_acceptance_collects_independent_failures_and_rejects_candidate(self):
+        with tempfile.TemporaryDirectory() as directory, open(os.devnull, 'wb') as log:
+            root = pathlib.Path(directory)
+            build = candidate.Candidate(self.config(), 'linux-amd64', '1.4.9', root, log)
+            calls = []
+            def run(args, cwd=None, env=None):
+                calls.append((args, cwd))
+                if 'test' in args and 'go' in args and cwd == build.paths['base']:
+                    raise subprocess.CalledProcessError(1, args)
+            with patch.object(build, 'run', side_effect=run), \
+                    patch.object(build, 'verify_install', side_effect=ValueError('synthetic installer failure')) as install:
+                with self.assertRaises(ExceptionGroup) as failed:
+                    build.verify_native(root / 'candidate', root / 'stage')
+            self.assertEqual([type(error) for error in failed.exception.exceptions],
+                             [subprocess.CalledProcessError, ValueError])
+            self.assertEqual(len(calls), 6)
+            self.assertEqual(calls[-1][0][1], 'test')
+            install.assert_called_once_with(root / 'candidate')
 
 
 if __name__ == '__main__':
