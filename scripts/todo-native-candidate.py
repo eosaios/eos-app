@@ -144,19 +144,39 @@ class Candidate:
         stage = pro / '.release' / ('stable-production-' + self.version + '-' + self.platform + '.noindex')
         pair = stage / 'core'
         shutil.copytree(pair, pro / 'pro/bin', dirs_exist_ok=True)
+        self.verify_native(candidate, stage)
+        return candidate
+
+    def verify_native(self, candidate, stage):
+        base, pro = [self.paths[name] for name in ['base', 'pro']]
+        executable = 'eos-core-todo' + ('.exe' if os.name == 'nt' else '')
+        pair = stage / 'core'
         self.stage = 'native regression tests'
         test_env = dict(self.env, GOFLAGS='-overlay=' + str(stage / 'overlay.json'),
                         EOS_CORE_TODO_BIN=str(pair / executable), EOS_CORE_TODO_TEST_MANIFEST=str(pair / 'core-manifest.json'))
         npm = 'npm.cmd' if os.name == 'nt' else 'npm'
         self.run([npm, 'run', 'build'], base / 'frontend')
         prefix = ['xvfb-run', '-a'] if os.name != 'nt' else []
+        failures = []
         for source in [base, pro]:
-            self.run(prefix + ['go', 'test', './...'], source, test_env)
-            self.run(['go', 'vet', './...'], source, test_env)
-        self.run([npm, 'test', '--', '--run', '--maxWorkers=2', '--testTimeout=15000'], pro / '.compose/frontend')
+            for command in [prefix + ['go', 'test', './...'], ['go', 'vet', './...']]:
+                try:
+                    self.run(command, source, test_env)
+                except subprocess.CalledProcessError as error:
+                    failures.append(error)
+        try:
+            self.run([npm, 'test', '--', '--run', '--maxWorkers=2', '--testTimeout=15000'], pro / '.compose/frontend')
+        except subprocess.CalledProcessError as error:
+            failures.append(error)
         self.stage = 'installer lifecycle'
-        self.verify_install(candidate)
-        return candidate
+        try:
+            self.verify_install(candidate)
+        except Exception as error:
+            self.log.write(traceback.format_exc().encode())
+            failures.append(error)
+        if failures:
+            self.stage = 'native acceptance'
+            raise ExceptionGroup('native checks failed; candidate cannot be exported', failures)
 
     def verify_binary(self, binary):
         info = json.loads(self.capture([binary, '--build-info']))
