@@ -31,6 +31,16 @@ class PrivacyGuards(unittest.TestCase):
         with self.assertRaises(ValueError):
             candidate.validate_config(self.config(), '1.4.10')
 
+    def test_beta_uses_its_own_version_rules_and_install_identity(self):
+        config = dict(self.config(), version='1.4.10-beta.1', channel='beta')
+        candidate.validate_config(config, config['version'])
+        with self.assertRaises(ValueError):
+            candidate.validate_config(dict(config, channel='stable'), config['version'])
+        with tempfile.TemporaryDirectory() as directory, open(os.devnull, 'wb') as log:
+            build = candidate.Candidate(config, 'darwin-arm64', config['version'], pathlib.Path(directory), log)
+            self.assertEqual((build.branch, build.app_key, build.scheme, build.data_dir),
+                             ('beta', 'eos-todo-beta', 'eostodo-beta', 'eos-todolist-beta'))
+
     def test_child_process_environment_excludes_credentials_and_configuration(self):
         with tempfile.TemporaryDirectory() as directory, open(os.devnull, 'wb') as log, patch.dict(os.environ, {
                 'PRIVATE_BUILD_CONFIG': 'private coordinates', 'PRIVATE_SOURCE_TOKEN': 'credential',
@@ -90,6 +100,30 @@ class PrivacyGuards(unittest.TestCase):
             sealed = (exported / 'diagnostics.fernet').read_bytes()
             self.assertNotIn(private.encode(), sealed)
             self.assertIn(private.encode(), Fernet(config['diagnostics_key'].encode()).decrypt(sealed))
+
+    def test_native_macos_app_and_build_manifest_are_exported_only_sealed(self):
+        config = dict(self.config(), version='1.4.10-beta.1', channel='beta',
+                      baselines={'darwin-arm64': {'version': '1.4.8-beta.1'}})
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            build_results = root / 'fixture'
+            build_results.mkdir()
+            files = ('build-manifest.json', 'macos-payload.zip')
+            for name in files:
+                (build_results / name).write_text('private candidate ' + name)
+            env = dict(RUNNER_TEMP=directory, PRIVATE_BUILD_CONFIG=json.dumps(config),
+                       PRIVATE_SOURCE_TOKEN='credential', CANDIDATE_VERSION=config['version'],
+                       CANDIDATE_PLATFORM='darwin-arm64', CANDIDATE_CHANNEL='beta')
+            with patch.dict(os.environ, env), patch.object(candidate.Candidate, 'checkout'), \
+                    patch.object(candidate.Candidate, 'build', return_value=build_results), contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(candidate.main(), 0)
+            exported = root / 'todo-export'
+            self.assertEqual(sorted(p.name for p in exported.iterdir()),
+                             sorted(['diagnostics.fernet', 'verification.json'] + [name + '.fernet' for name in files]))
+            sealing = Fernet(config['diagnostics_key'].encode())
+            for name in files:
+                self.assertEqual(sealing.decrypt((exported / (name + '.fernet')).read_bytes()),
+                                 (build_results / name).read_bytes())
 
     def test_native_acceptance_collects_independent_failures_and_rejects_candidate(self):
         with tempfile.TemporaryDirectory() as directory, open(os.devnull, 'wb') as log:
