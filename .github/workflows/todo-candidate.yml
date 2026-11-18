@@ -4,11 +4,15 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Stable candidate version
+        description: Frozen candidate version
         required: true
+      channel:
+        type: choice
+        options: [stable, beta]
+        default: stable
       target:
         type: choice
-        options: [all, windows-amd64, linux-amd64]
+        options: [all, windows-amd64, linux-amd64, darwin-arm64]
         default: all
 
 permissions:
@@ -22,7 +26,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(inputs.target == 'windows-amd64' && '[{"platform":"windows-amd64","runner":"windows-latest"}]' || inputs.target == 'linux-amd64' && '[{"platform":"linux-amd64","runner":"ubuntu-24.04"}]' || '[{"platform":"windows-amd64","runner":"windows-latest"},{"platform":"linux-amd64","runner":"ubuntu-24.04"}]') }}
+        include: ${{ fromJSON(
+          inputs.target == 'windows-amd64' && '[{"platform":"windows-amd64","runner":"windows-latest"}]' ||
+          inputs.target == 'linux-amd64' && '[{"platform":"linux-amd64","runner":"ubuntu-24.04"}]' ||
+          inputs.target == 'darwin-arm64' && '[{"platform":"darwin-arm64","runner":"macos-26"}]' ||
+          inputs.channel == 'beta' && '[{"platform":"windows-amd64","runner":"windows-latest"},{"platform":"linux-amd64","runner":"ubuntu-24.04"},{"platform":"darwin-arm64","runner":"macos-26"}]' ||
+          '[{"platform":"windows-amd64","runner":"windows-latest"},{"platform":"linux-amd64","runner":"ubuntu-24.04"}]') }}
     env:
       PYTHONUTF8: '1'
       CARGO_TERM_COLOR: never
@@ -60,8 +69,9 @@ jobs:
         shell: bash
         env:
           CANDIDATE_VERSION: ${{ inputs.version }}
+          CANDIDATE_CHANNEL: ${{ inputs.channel }}
           CANDIDATE_PLATFORM: ${{ matrix.platform }}
-          PRIVATE_BUILD_CONFIG: ${{ secrets.EOS_TODO_BUILD_CONFIG }}
+          PRIVATE_BUILD_CONFIG: ${{ inputs.channel == 'beta' && secrets.EOS_TODO_BETA_BUILD_CONFIG || secrets.EOS_TODO_BUILD_CONFIG }}
           PRIVATE_SOURCE_TOKEN: ${{ secrets.EOS_CORE_PAT }}
         run: |
           if [[ "$RUNNER_OS" == "Linux" ]]; then
