@@ -29,23 +29,35 @@ def verified_live_catalog(root, platform):
     return live_gate, sha(expected_snapshot)
 
 
+def verified_composer_input(root, platform):
+    gate = json.loads((root / 'dist' / f'composer-input-{platform}.json').read_text())
+    assert gate['passed'] and gate['unknown_limit_explicit']
+    assert gate['oversized_turn_rejected_before_persistence'] and gate['no_cloud_requests']
+    assert gate['oversized_polish_rejected_before_inference']
+    assert gate['inference_requests'] == 0
+    assert gate['exact_boundary']['estimated_tokens'] == gate['exact_boundary']['max_input_tokens'] == 8
+    assert gate['selected_larger_model']['estimated_tokens'] == 8
+    assert gate['selected_larger_model']['max_input_tokens'] == 256
+    return gate
+
+
 def record(args):
     root = Path.cwd()
     version = args.version.removeprefix('v')
     channel = args.channel
-    names = {'stable': 'EOS', 'beta': 'EOS Beta', 'dev': 'EOS Dev'}
+    names = {'stable': 'EOS Agent', 'beta': 'EOS Agent Beta', 'dev': 'EOS Agent Dev'}
     bundle_id = 'com.eosaios.eos-app' + ('' if channel == 'stable' else '.' + channel)
-    stage = root / 'dist' / f'eos-app_{version}_{args.platform}'
+    stage = root / 'dist' / f'eos-agent_{version}_{args.platform}'
     if args.platform.startswith('darwin-'):
         bundle = stage / (names[channel] + '.app')
         info = plistlib.loads((bundle / 'Contents/Info.plist').read_bytes())
         assert (info['CFBundleIdentifier'], info['CFBundleShortVersionString']) == (bundle_id, version)
         scheme = 'eosagent' + ('' if channel == 'stable' else '-' + channel)
         assert info['CFBundleURLTypes'][0]['CFBundleURLSchemes'] == [scheme]
-        binary = bundle / 'Contents/MacOS/eos-app'
+        binary = bundle / 'Contents/MacOS/eos-agent'
         core_dir = bundle / 'Contents/Resources/core' / args.triple
     else:
-        binary = stage / ('eos-app.exe' if args.platform.startswith('windows-') else 'eos-app')
+        binary = stage / ('eos-agent.exe' if args.platform.startswith('windows-') else 'eos-agent')
         core_dir = stage / 'core' / args.triple
     manifest = json.loads((core_dir / 'manifest.json').read_text())
     core_sha = sha(core_dir / manifest['binary'])
@@ -84,6 +96,7 @@ def record(args):
     for request in dynamic_gate['requests']:
         assert len(list(image_blocks(request['body']))) == int(request['actual_image_bytes_sent'])
     live_gate, expected_catalog_sha = verified_live_catalog(root, args.platform)
+    composer_input_gate = verified_composer_input(root, args.platform)
     app_source = revision(root)
     identity = (root / 'dist' / f'build-identity-{args.platform}.txt').read_text()
     assert 'vcs.revision=' + app_source['commit'] in identity
@@ -99,6 +112,7 @@ def record(args):
         'core_source': revision(root.parent / 'eos-core-rs'),
         'distribution_source': revision(root.parent / 'release-tools'),
         'workflow_run_id': os.environ['GITHUB_RUN_ID'],
+        'core_build_workflow_run_id': os.environ.get('EOS_REUSED_CORE_RUN_ID') or os.environ['GITHUB_RUN_ID'],
         'build_workflow_run_id': os.environ.get('EOS_REUSED_BUILD_RUN_ID', os.environ['GITHUB_RUN_ID']),
         'expected_catalog_sha256': expected_catalog_sha,
         'bundle_id': bundle_id, 'app_binary_sha256': sha(binary),
@@ -108,6 +122,7 @@ def record(args):
         'native_upgrade_gate': gate, 'native_proxy_gate': proxy_gate,
         'native_capability_gate': capability_gate, 'native_dynamic_capability_gate': dynamic_gate,
         'native_live_catalog_gate': live_gate, 'files': files,
+        'native_composer_input_gate': composer_input_gate,
     }
     (root / 'dist' / f'provenance-{args.platform}.json').write_text(json.dumps(result, indent=2) + '\n')
     print(json.dumps(result))
