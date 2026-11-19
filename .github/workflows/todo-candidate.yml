@@ -61,12 +61,17 @@ jobs:
           fi
           read -r -a packages <<< "$documented"
           sudo apt-get "${options[@]}" install -y "${packages[@]}"
+          sudo apt-get "${options[@]}" install -y xvfb xauth dbus-x11
       - name: Verify clean installation of the frozen candidate
         shell: bash
         env:
           PLATFORM: ${{ inputs.target }}
         run: |
-          python - <<'PY'
+          display=()
+          if [[ "$RUNNER_OS" == Linux ]]; then
+            display=(xvfb-run -a dbus-run-session)
+          fi
+          "${display[@]}" python - <<'PY'
           import hashlib
           import json
           import os
