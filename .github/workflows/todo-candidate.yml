@@ -10,6 +10,9 @@ on:
       candidate_run:
         required: true
         type: string
+      preflight:
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -33,6 +36,8 @@ jobs:
       - name: Install isolated Linux runtime dependencies
         if: runner.os == 'Linux'
         shell: bash
+        env:
+          PREFLIGHT: ${{ inputs.preflight }}
         run: |
           . /etc/os-release
           test "$VERSION_CODENAME" = noble
@@ -48,7 +53,14 @@ jobs:
                    -o Acquire::Retries=2 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20
                    -o DPkg::Lock::Timeout=45)
           sudo apt-get "${options[@]}" -o APT::Update::Error-Mode=any update
-          sudo apt-get "${options[@]}" install -y libgtk-4-1 libwebkitgtk-6.0-4 libpipewire-0.3-0t64 libxdo3 xdg-utils desktop-file-utils
+          documented='libgtk-4-1 libwebkitgtk-6.0-4 libx11-xcb1 libxkbcommon-x11-0 libxtst6'
+          if [[ "$PREFLIGHT" != true ]]; then
+            tar -xOzf "$RUNNER_TEMP"/todo-frozen/eos-todo_1.4.11_linux-amd64.tar.gz EOS-Todo/README.txt > "$RUNNER_TEMP/todo-install.txt"
+            shipped=$(sed -n 's/^Install dependencies: sudo apt install //p' "$RUNNER_TEMP/todo-install.txt")
+            test "$shipped" = "$documented"
+          fi
+          read -r -a packages <<< "$documented"
+          sudo apt-get "${options[@]}" install -y "${packages[@]}"
       - name: Verify clean installation of the frozen candidate
         shell: bash
         env:
