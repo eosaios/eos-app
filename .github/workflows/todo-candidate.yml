@@ -93,7 +93,7 @@ jobs:
           
           if platform == "windows-amd64":
               import winreg
-              destination = root / "Todo clean"
+              destination = Path(os.environ["LOCALAPPDATA"]) / "Programs" / "EOS Todo"
               binary = destination / "eos-todo.exe"
               protocol = r"Software\Classes\eostodo\shell\open\command"
               assert not destination.exists()
@@ -102,7 +102,7 @@ jobs:
                       raise AssertionError("Todo protocol already registered")
               except FileNotFoundError:
                   pass
-              subprocess.run([str(package), "/S", "/D=" + str(destination)], check=True)
+              subprocess.run([str(package), "/S"], check=True)
               with winreg.OpenKey(winreg.HKEY_CURRENT_USER, protocol) as key:
                   assert str(binary).lower() in winreg.QueryValueEx(key, "")[0].lower()
           else:
