@@ -41,6 +41,24 @@ class PrivacyGuards(unittest.TestCase):
             self.assertEqual((build.branch, build.app_key, build.scheme, build.data_dir),
                              ('beta', 'eos-todo-beta', 'eostodo-beta', 'eos-todolist-beta'))
 
+    def test_beta_baseline_accepts_only_the_exact_official_api_version(self):
+        config = dict(self.config(), version='1.4.10-beta.1', channel='beta')
+        with tempfile.TemporaryDirectory() as directory, open(os.devnull, 'wb') as log:
+            root = pathlib.Path(directory)
+            build = candidate.Candidate(config, 'darwin-arm64', config['version'], root, log)
+            tested = root / 'fixture'
+            tested.write_bytes(b'authentic package fixture')
+            reference = {'url': 'https://api.eosaios.com/api/v1/download/versions/273/file/eos-todo-beta_old.dmg',
+                         'sha256': candidate.digest(tested), 'version_id': 273}
+            with patch.object(build, 'run') as download:
+                build.download_baseline(reference, tested)
+                download.assert_called_once()
+                for update in ({'version_id': 274}, {'url': reference['url'].replace('api.eosaios.com', 'other.example')},
+                               {'url': reference['url'] + '?redirect=elsewhere'}):
+                    with self.assertRaises(ValueError):
+                        build.download_baseline(dict(reference, **update), tested)
+                download.assert_called_once()
+
     def test_child_process_environment_excludes_credentials_and_configuration(self):
         with tempfile.TemporaryDirectory() as directory, open(os.devnull, 'wb') as log, patch.dict(os.environ, {
                 'PRIVATE_BUILD_CONFIG': 'private coordinates', 'PRIVATE_SOURCE_TOKEN': 'credential',

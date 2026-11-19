@@ -272,9 +272,15 @@ class Candidate:
 
     def download_baseline(self, reference, package):
         parsed = urllib.parse.urlparse(reference['url'])
-        if parsed.scheme != 'https' or parsed.netloc != 'dl.eosaios.com' or not re.fullmatch(r'[0-9a-f]{64}', reference['sha256']):
+        api_path = re.fullmatch(r'/api/v1/download/versions/([0-9]+)/file/[0-9A-Za-z_.+-]+', parsed.path)
+        expected_api_file = (parsed.netloc == 'api.eosaios.com' and api_path is not None
+                             and api_path[1] == str(reference.get('version_id')))
+        cdn_file = parsed.netloc == 'dl.eosaios.com' and parsed.path.startswith('/versions/')
+        if (parsed.scheme != 'https' or not (expected_api_file or cdn_file) or parsed.query or parsed.fragment
+                or not re.fullmatch(r'[0-9a-f]{64}', reference['sha256'])):
             raise ValueError('invalid frozen package reference')
-        self.run(['curl', '--fail', '--location', '--silent', '--show-error', '--max-time', '120',
+        self.run(['curl', '--fail', '--location', '--proto', '=https', '--proto-redir', '=https',
+                  '--silent', '--show-error', '--max-time', '120',
                   '--output', package, reference['url']])
         if digest(package) != reference['sha256']:
             raise ValueError('frozen package digest differs')
