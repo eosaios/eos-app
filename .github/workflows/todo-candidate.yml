@@ -1,59 +1,37 @@
-name: Todo native candidate
+name: Todo clean installation acceptance
 
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: Frozen candidate version
-        required: true
-      channel:
-        type: choice
-        options: [stable, beta]
-        default: stable
       target:
+        required: true
         type: choice
-        options: [all, windows-amd64, linux-amd64, darwin-arm64]
-        default: all
+        options: [windows-amd64, linux-amd64]
+      candidate_run:
+        required: true
+        type: string
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
-  native:
-    name: Todo (${{ matrix.platform }})
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 65
-    strategy:
-      fail-fast: false
-      matrix:
-        include: ${{ fromJSON(
-          inputs.target == 'windows-amd64' && '[{"platform":"windows-amd64","runner":"windows-latest"}]' ||
-          inputs.target == 'linux-amd64' && '[{"platform":"linux-amd64","runner":"ubuntu-24.04"}]' ||
-          inputs.target == 'darwin-arm64' && '[{"platform":"darwin-arm64","runner":"macos-26"}]' ||
-          inputs.channel == 'beta' && '[{"platform":"windows-amd64","runner":"windows-latest"},{"platform":"linux-amd64","runner":"ubuntu-24.04"},{"platform":"darwin-arm64","runner":"macos-26"}]' ||
-          '[{"platform":"windows-amd64","runner":"windows-latest"},{"platform":"linux-amd64","runner":"ubuntu-24.04"}]') }}
-    env:
-      PYTHONUTF8: '1'
-      CARGO_TERM_COLOR: never
+  clean-installation:
+    name: Clean installation (${{ inputs.target }})
+    runs-on: ${{ inputs.target == 'windows-amd64' && 'windows-latest' || 'ubuntu-24.04' }}
+    timeout-minutes: 12
     steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
-      - uses: actions/setup-go@v6
+      - uses: actions/download-artifact@v4
         with:
-          go-version: '1.26.x'
-          cache: false
-      - uses: actions/setup-node@v5
-        with:
-          node-version: '22'
-      - name: Install diagnostic encryption
-        run: python -m pip install cryptography==46.0.3
-      - name: Install native Linux prerequisites
+          name: todo-candidate-${{ inputs.target }}
+          run-id: ${{ inputs.candidate_run }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/todo-frozen
+      - name: Install isolated Linux runtime dependencies
         if: runner.os == 'Linux'
-        timeout-minutes: 7
         shell: bash
         run: |
           . /etc/os-release
@@ -62,13 +40,7 @@ jobs:
           cat > "$sources" <<'SOURCES'
           Types: deb
           URIs: https://archive.ubuntu.com/ubuntu
-          Suites: noble noble-updates noble-backports
-          Components: main restricted universe multiverse
-          Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
-
-          Types: deb
-          URIs: https://security.ubuntu.com/ubuntu
-          Suites: noble-security
+          Suites: noble noble-updates noble-backports noble-security
           Components: main restricted universe multiverse
           Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
           SOURCES
@@ -76,35 +48,58 @@ jobs:
                    -o Acquire::Retries=2 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20
                    -o DPkg::Lock::Timeout=45)
           sudo apt-get "${options[@]}" -o APT::Update::Error-Mode=any update
-          sudo apt-get "${options[@]}" install -y libgtk-4-dev libwebkitgtk-6.0-dev pkg-config libpipewire-0.3-dev libdrm-dev libgbm-dev libwayland-dev libxdo-dev libx11-dev libx11-xcb-dev libxtst-dev libxkbcommon-dev libxkbcommon-x11-dev xdg-utils desktop-file-utils xvfb xauth dbus-x11 libnotify-bin dunst thunar
-      - name: Install native Windows prerequisites
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          choco install nsis mingw --no-progress -y
-          'C:\Program Files (x86)\NSIS' >> $env:GITHUB_PATH
-          'C:\ProgramData\mingw64\mingw64\bin' >> $env:GITHUB_PATH
-          'C:\msys64\mingw64\bin' >> $env:GITHUB_PATH
-          'C:\Program Files\Git\bin' >> $env:GITHUB_PATH
-      - name: Build and verify isolated candidate
+          sudo apt-get "${options[@]}" install -y libgtk-4-1 libwebkitgtk-6.0-4 libpipewire-0.3-0t64 libxdo3 xdg-utils desktop-file-utils
+      - name: Verify clean installation of the frozen candidate
         shell: bash
         env:
-          CANDIDATE_VERSION: ${{ inputs.version }}
-          CANDIDATE_CHANNEL: ${{ inputs.channel }}
-          CANDIDATE_PLATFORM: ${{ matrix.platform }}
-          PRIVATE_BUILD_CONFIG: ${{ inputs.channel == 'beta' && secrets.EOS_TODO_BETA_BUILD_CONFIG || secrets.EOS_TODO_BUILD_CONFIG }}
-          PRIVATE_SOURCE_TOKEN: ${{ secrets.EOS_CORE_PAT }}
+          PLATFORM: ${{ inputs.target }}
         run: |
-          if [[ "$RUNNER_OS" == "Linux" ]]; then
-            xvfb-run -a dbus-run-session -- python scripts/todo-native-candidate.py
-          else
-            python scripts/todo-native-candidate.py
-          fi
-      - name: Export candidate allowlist and sealed diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: todo-candidate-${{ matrix.platform }}
-          path: ${{ runner.temp }}/todo-export/*
-          retention-days: 7
-          if-no-files-found: warn
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import subprocess
+          import tarfile
+          
+          platform = os.environ["PLATFORM"]
+          root = Path(os.environ["RUNNER_TEMP"])
+          candidate = root / "todo-frozen"
+          manifest = json.loads((candidate / "release-manifest.json").read_text())
+          receipt = json.loads((candidate / "verification.json").read_text())
+          extension = "exe" if platform == "windows-amd64" else "tar.gz"
+          package = candidate / f"eos-todo_1.4.11_{platform}.{extension}"
+          assert manifest["file"] == package.name and manifest["platform"] == platform
+          assert manifest["version"] == receipt["version"] == "1.4.11"
+          assert all(receipt[key] is True for key in ("native_package_verified", "native_regressions_passed", "installer_lifecycle_passed"))
+          assert hashlib.sha256(package.read_bytes()).hexdigest() == manifest["sha256"] == receipt["sha256"]
+          
+          if platform == "windows-amd64":
+              import winreg
+              destination = root / "Todo clean"
+              binary = destination / "eos-todo.exe"
+              protocol = r"Software\Classes\eostodo\shell\open\command"
+              assert not destination.exists()
+              try:
+                  with winreg.OpenKey(winreg.HKEY_CURRENT_USER, protocol):
+                      raise AssertionError("Todo protocol already registered")
+              except FileNotFoundError:
+                  pass
+              subprocess.run([str(package), "/S", "/D=" + str(destination)], check=True)
+              with winreg.OpenKey(winreg.HKEY_CURRENT_USER, protocol) as key:
+                  assert str(binary).lower() in winreg.QueryValueEx(key, "")[0].lower()
+          else:
+              extracted = root / "todo-clean-extracted"
+              binary = Path.home() / ".local/share/eos-todo/eos-todo"
+              desktop = Path.home() / ".local/share/applications/eos-todo.desktop"
+              assert not binary.exists() and not desktop.exists()
+              with tarfile.open(package) as archive:
+                  archive.extractall(extracted, filter="data")
+              installer, = extracted.glob("*/install-user.sh")
+              subprocess.run(["bash", str(installer)], check=True)
+              assert "MimeType=x-scheme-handler/eostodo;" in desktop.read_text()
+          info = json.loads(subprocess.check_output([str(binary), "--build-info"]))
+          assert (info["version"], info["channel"], info["app_key"], info["environment"]) == ("1.4.11", "stable", "eos-todo", "production")
+          assert json.loads(subprocess.check_output([str(binary), "--verify-package"]))["passed"] is True
+          print(f"{platform}: native clean installation, application identity, and packaged runtime passed. SHA-256 {manifest['sha256']}")
+          PY
